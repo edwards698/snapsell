@@ -31,6 +31,21 @@ const envSchema = z.object({
   // Verified 2026-10-31: stable, accepts image + audio input and JSON-schema output.
   GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
   JOB_POLL_MS: z.coerce.number().int().positive().default(250),
+  // DevDraft (BUILD_PLAN §7). `fake` simulates links and signed webhooks locally; never in production.
+  DEVDRAFT_MODE: z.enum(['fake', 'sandbox', 'live']).default('fake'),
+  DEVDRAFT_BASE_URL: z.url().default('https://api.devdraft.com'),
+  DEVDRAFT_CLIENT_KEY: optionalString,
+  DEVDRAFT_CLIENT_SECRET: optionalString,
+  DEVDRAFT_WEBHOOK_SECRET: optionalString,
+  DEVDRAFT_SIGNATURE_HEADER: z.string().default('x-webhook-signature'),
+  DEVDRAFT_LINK_TYPE: z
+    .enum(['PRODUCT', 'DONATION', 'INVOICE', 'SUBSCRIPTION', 'COLLECTION'])
+    .default('INVOICE'),
+  DEVDRAFT_CURRENCIES: z.string().default('usdc,eurc'),
+  /** Response field holding the customer-facing URL – not in the published docs; confirm with DevDraft. */
+  DEVDRAFT_PAYMENT_URL_FIELD: optionalString,
+  /** Alternative once DevDraft confirms the format, e.g. https://pay.example.com/{url}. */
+  DEVDRAFT_PAYMENT_URL_TEMPLATE: optionalString,
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -58,6 +73,18 @@ export interface AppConfig {
   uploads: { maxBytes: number };
   jobs: { pollMs: number };
   ai: { geminiApiKey?: string; model: string };
+  devdraft: {
+    mode: 'fake' | 'sandbox' | 'live';
+    baseUrl: string;
+    clientKey?: string;
+    clientSecret?: string;
+    webhookSecret: string;
+    signatureHeader: string;
+    linkType: string;
+    currencies: string[];
+    paymentUrlField?: string;
+    paymentUrlTemplate?: string;
+  };
 }
 
 export class ConfigError extends Error {}
@@ -70,6 +97,20 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   const e = parsed.data;
   const data = resolve(e.DATA_DIR);
+  if (e.DEVDRAFT_MODE === 'fake' && e.NODE_ENV === 'production') {
+    throw new ConfigError(
+      'Invalid configuration:\n  - DEVDRAFT_MODE: "fake" is for development only; use "sandbox" or "live"',
+    );
+  }
+  if (e.DEVDRAFT_MODE !== 'fake') {
+    const missing = (
+      ['DEVDRAFT_CLIENT_KEY', 'DEVDRAFT_CLIENT_SECRET', 'DEVDRAFT_WEBHOOK_SECRET'] as const
+    ).filter((k) => !e[k]);
+    if (missing.length)
+      throw new ConfigError(
+        `Invalid configuration:\n${missing.map((k) => `  - ${k}: required when DEVDRAFT_MODE is ${e.DEVDRAFT_MODE}`).join('\n')}`,
+      );
+  }
   return {
     env: e.NODE_ENV,
     isProduction: e.NODE_ENV === 'production',
@@ -92,5 +133,20 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     uploads: { maxBytes: Math.round(e.MAX_UPLOAD_MB * 1024 * 1024) },
     jobs: { pollMs: e.JOB_POLL_MS },
     ai: { geminiApiKey: e.GEMINI_API_KEY, model: e.GEMINI_MODEL },
+    devdraft: {
+      mode: e.DEVDRAFT_MODE,
+      baseUrl: e.DEVDRAFT_BASE_URL.replace(/\/$/, ''),
+      clientKey: e.DEVDRAFT_CLIENT_KEY,
+      clientSecret: e.DEVDRAFT_CLIENT_SECRET,
+      // Fake mode signs its simulated webhooks with a key derived from the session secret.
+      webhookSecret: e.DEVDRAFT_WEBHOOK_SECRET ?? `fake-${e.SESSION_SECRET}`,
+      signatureHeader: e.DEVDRAFT_SIGNATURE_HEADER.toLowerCase(),
+      linkType: e.DEVDRAFT_LINK_TYPE,
+      currencies: e.DEVDRAFT_CURRENCIES.split(',')
+        .map((c) => c.trim().toLowerCase())
+        .filter(Boolean),
+      paymentUrlField: e.DEVDRAFT_PAYMENT_URL_FIELD,
+      paymentUrlTemplate: e.DEVDRAFT_PAYMENT_URL_TEMPLATE,
+    },
   };
 }

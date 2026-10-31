@@ -431,6 +431,8 @@ export const payments = sqliteTable(
     status: enumText('status', PaymentRecordStatus).notNull(),
     idempotencyKey: text('idempotency_key').notNull(),
     rawResponse: json<unknown>('raw_response'),
+    /** Why link creation failed, shown to the owner. */
+    lastError: text('last_error'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -455,12 +457,15 @@ export const webhookEvents = sqliteTable(
     payload: json<unknown>('payload'),
     status: enumText('status', WebhookEventStatus).notNull().default('RECEIVED'),
     outcome: text('outcome'),
+    /** Set once the event is matched to an order by its stored payment link id. */
+    orderId: text('order_id').references(() => orders.id),
     attempts: integer('attempts').notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex('webhook_events_provider_event_unique').on(t.provider, t.providerEventId),
+    index('webhook_events_order_idx').on(t.orderId),
     check('webhook_events_status_check', oneOf(t.status, WebhookEventStatus)),
   ],
 );

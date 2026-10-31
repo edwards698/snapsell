@@ -38,6 +38,11 @@ function IntegrationCard({ icon: Icon, name, description, badge, detail }: Row) 
 export function Integrations() {
   const { data, isPending } = useSystemStatus();
   const resend = data?.email.provider === 'resend';
+  const devdraft = data?.integrations.find((i) => i.kind === 'DEVDRAFT');
+  const webhookUrl =
+    typeof window === 'undefined'
+      ? '/api/webhooks/devdraft'
+      : `${window.location.origin}/api/webhooks/devdraft`;
 
   return (
     <>
@@ -88,9 +93,37 @@ export function Integrations() {
           <IntegrationCard
             icon={CreditCard}
             name="DevDraft payments"
-            description="Secure payment links for website and WhatsApp orders, confirmed by verified webhooks."
-            badge={<Badge tone="outline">Phase 4</Badge>}
-            detail="Connection test, webhook status and payment history will appear here."
+            description="Secure payment links for website and WhatsApp orders, confirmed by signed notifications (webhooks)."
+            badge={
+              devdraft?.status === 'CONFIGURED' ? (
+                <Badge tone="success" dot>
+                  Configured
+                </Badge>
+              ) : (
+                <Badge tone="warning" dot>
+                  Test mode
+                </Badge>
+              )
+            }
+            detail={
+              <div className="grid gap-2">
+                <p>
+                  {devdraft?.status === 'CONFIGURED'
+                    ? devdraft.detail
+                    : 'Payments are simulated on a local test page – no money moves. Set DEVDRAFT_MODE, keys and webhook secret in .env to go live.'}
+                </p>
+                <p>
+                  Webhook URL to register in DevDraft:{' '}
+                  <code className="break-all rounded bg-surface px-1.5 py-0.5 font-mono text-xs text-foreground">
+                    {webhookUrl}
+                  </code>
+                </p>
+                <p>
+                  Before going live, confirm with DevDraft: ZMW support (their docs list USDC and
+                  EURC), the customer payment URL, and the webhook payload format.
+                </p>
+              </div>
+            }
           />
           <IntegrationCard
             icon={MessageCircle}

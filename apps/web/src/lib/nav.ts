@@ -48,7 +48,6 @@ export const NAV: NavGroup[] = [
         label: 'Orders',
         icon: Receipt,
         description: 'Every website and WhatsApp order, with payment and delivery status.',
-        phase: 4,
       },
       {
         href: '/admin/inbox',
@@ -92,7 +91,6 @@ export const NAV: NavGroup[] = [
         label: 'Customers',
         icon: Users,
         description: 'Customer details, order history and conversations in one place.',
-        phase: 3,
       },
     ],
   },
@@ -104,7 +102,6 @@ export const NAV: NavGroup[] = [
         label: 'Payments',
         icon: CreditCard,
         description: 'DevDraft payment links, verified payments and webhook history.',
-        phase: 4,
       },
       {
         href: '/admin/reports',

@@ -23,6 +23,7 @@ import { signOut, useSessionUser } from '@/components/admin/session';
 import { PasswordStrength } from '@/components/auth/password-strength';
 import { useFormErrors } from '@/components/auth/use-form-errors';
 import { api } from '@/lib/api';
+import { ShopCard } from './shop-card';
 
 function AccountCard() {
   const user = useSessionUser();
@@ -143,8 +144,12 @@ function AppearanceCard() {
 export function Settings() {
   return (
     <>
-      <PageHeader title="Settings" description="Your account, password and how the admin looks." />
+      <PageHeader
+        title="Settings"
+        description="Your shop, account, password and how the admin looks."
+      />
       <div className="grid gap-4 sm:gap-6">
+        <ShopCard />
         <AccountCard />
         <PasswordCard />
         <AppearanceCard />

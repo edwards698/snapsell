@@ -15,7 +15,12 @@ export default async function StoreLayout({ children }: { children: React.ReactN
             <p>
               © {new Date().getFullYear()} {store.name}
             </p>
-            <p>Secure payments · Order online or on WhatsApp</p>
+            <p className="flex gap-4">
+              <span>Secure payments · Order online or on WhatsApp</span>
+              <a href="/privacy" className="underline-offset-4 hover:underline">
+                Privacy
+              </a>
+            </p>
           </div>
         </footer>
       </div>

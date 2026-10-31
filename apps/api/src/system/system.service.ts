@@ -131,7 +131,7 @@ export class SystemService implements OnModuleInit {
           id: 'payments',
           title: 'Connect DevDraft payments',
           description: 'Send secure payment links for website and WhatsApp orders.',
-          done: devdraft?.status === 'CONNECTED',
+          done: devdraft?.status === 'CONFIGURED',
           href: '/admin/integrations',
         },
         {

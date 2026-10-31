@@ -28,28 +28,26 @@ afterEach(async () => {
 });
 
 function makeVariant(stock: number) {
-  const product = t.app
-    .get(ProductsService)
-    .create(
-      {
-        name: 'Headphones',
-        description: '',
-        categoryId: null,
-        status: 'ACTIVE',
-        optionNames: [],
-        variants: [
-          {
-            sku: '',
-            optionValues: {},
-            priceMinor: 35000,
-            compareAtMinor: null,
-            initialStock: stock,
-            lowStockThreshold: 3,
-          },
-        ],
-      },
-      ownerId,
-    );
+  const product = t.app.get(ProductsService).create(
+    {
+      name: 'Headphones',
+      description: '',
+      categoryId: null,
+      status: 'ACTIVE',
+      optionNames: [],
+      variants: [
+        {
+          sku: '',
+          optionValues: {},
+          priceMinor: 35000,
+          compareAtMinor: null,
+          initialStock: stock,
+          lowStockThreshold: 3,
+        },
+      ],
+    },
+    ownerId,
+  );
   return product.variants[0]!.id;
 }
 

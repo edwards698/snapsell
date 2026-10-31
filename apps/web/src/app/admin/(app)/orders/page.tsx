@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
-import { ComingSoon } from '@/components/admin/coming-soon';
+import { Suspense } from 'react';
+import { OrdersPage } from './orders-page';
 
 export const metadata: Metadata = { title: 'Orders' };
 
 export default function Page() {
-  return <ComingSoon href="/admin/orders" />;
+  return (
+    <Suspense>
+      <OrdersPage />
+    </Suspense>
+  );
 }

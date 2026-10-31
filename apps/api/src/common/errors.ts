@@ -8,6 +8,8 @@ export class ApiError extends HttpException {
     message: string,
     readonly fields?: Record<string, string>,
     readonly headers?: Record<string, string>,
+    /** Extra machine-readable data, e.g. the re-priced cart when a checkout is rejected. */
+    readonly details?: unknown,
   ) {
     super({ code, message, fields }, status);
   }

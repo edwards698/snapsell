@@ -7,6 +7,7 @@ export class ApiRequestError extends Error {
     readonly code: string,
     message: string,
     readonly fields: Record<string, string> = {},
+    readonly details?: unknown,
   ) {
     super(message);
   }
@@ -59,6 +60,7 @@ export async function api<T>(
       err?.code ?? `HTTP_${res.status}`,
       err?.message ?? 'Something went wrong. Please try again.',
       err?.fields,
+      err?.details,
     );
   }
   return body as T;

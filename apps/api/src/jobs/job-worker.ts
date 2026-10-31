@@ -93,10 +93,12 @@ export class JobWorker implements OnApplicationBootstrap, OnApplicationShutdown 
     ]);
   }
 
-  /** Runs everything currently due, waiting for handlers to finish. Used by tests and the CLI. */
-  async drain(now = Date.now()) {
+  /** Runs everything due (including jobs queued while draining), waiting for handlers. Used by tests. */
+  async drain(atTime?: number) {
     let ran = 0;
     for (;;) {
+      // Without a fixed time, jobs queued by handlers during the drain are picked up too.
+      const now = atTime ?? Date.now();
       this.enqueueSchedules(now);
       const started = this.startJobs(now);
       if (started.length === 0 && this.inFlight.size === 0) return ran;

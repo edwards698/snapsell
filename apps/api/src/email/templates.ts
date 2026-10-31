@@ -75,9 +75,29 @@ export function passwordChangedEmail(data: {
   };
 }
 
+export function orderPaidEmail(data: {
+  shopName: string;
+  ref: string;
+  total: string;
+  url: string;
+  attention: boolean;
+}): RenderedEmail {
+  const body = `
+<h1 style="margin:0 0 12px;font-size:22px;line-height:28px;">💰 ${escape(data.ref)} is paid</h1>
+<p style="margin:0;font-size:15px;line-height:24px;color:#3f3f46;">DevDraft confirmed a payment of <strong>${escape(data.total)}</strong>. The stock has been taken off and the order is ready to prepare.</p>
+${data.attention ? '<p style="margin:12px 0 0;font-size:14px;line-height:22px;color:#b91c1c;"><strong>Needs your attention:</strong> check the order before fulfilling it.</p>' : ''}
+${button(data.url, 'Open the order')}`;
+  return {
+    subject: `${data.ref} paid – ${data.total}${data.attention ? ' (needs attention)' : ''}`,
+    html: layout({ shopName: data.shopName, preheader: `${data.ref} was paid.`, body }),
+    text: `${data.ref} was paid (${data.total}).${data.attention ? ' It needs your attention.' : ''}\n${data.url}`,
+  };
+}
+
 export const templates = {
   'password-reset': passwordResetEmail,
   'password-changed': passwordChangedEmail,
+  'order-paid': orderPaidEmail,
 } as const;
 
 export type TemplateName = keyof typeof templates;

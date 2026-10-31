@@ -13,6 +13,7 @@ import { EmailModule } from './email/email.module.js';
 import { FilesModule } from './files/files.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { LoggingModule } from './logging/logging.module.js';
+import { StoreModule } from './store/store.module.js';
 import { SystemModule } from './system/system.module.js';
 
 @Module({})
@@ -33,6 +34,7 @@ export class AppModule {
         AiModule,
         AuthModule,
         CatalogModule,
+        StoreModule,
         SystemModule,
       ],
       providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],

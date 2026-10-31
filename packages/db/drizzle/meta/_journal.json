@@ -22,6 +22,20 @@
       "when": 1793449025563,
       "tag": "0002_catalogue_options",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793451523919,
+      "tag": "0003_payment_errors",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793451700043,
+      "tag": "0004_webhook_order",
+      "breakpoints": true
     }
   ]
 }

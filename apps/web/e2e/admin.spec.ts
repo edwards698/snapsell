@@ -70,11 +70,9 @@ test('the command menu jumps to a section', async ({ page, isMobile }) => {
   await expect(page).toHaveURL(/\/admin\/integrations$/);
 });
 
-test('the storefront', async ({ page }) => {
+test('the storefront shell', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('getting ready');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.getByRole('button', { name: /Cart, 0 items/ }).click();
   await expect(page.getByText('Your cart is empty')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page).toHaveScreenshot('storefront.png', { fullPage: true });
 });

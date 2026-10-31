@@ -4,3 +4,5 @@ export * from './phone.js';
 export * from './auth.js';
 export * from './api.js';
 export * from './catalog.js';
+export * from './store.js';
+export * from './orders.js';

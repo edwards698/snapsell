@@ -39,7 +39,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof ApiError) {
       status = exception.getStatus();
-      body = { code: exception.code, message: exception.message, fields: exception.fields };
+      body = {
+        code: exception.code,
+        message: exception.message,
+        fields: exception.fields,
+        details: exception.details,
+      };
       for (const [k, v] of Object.entries(exception.headers ?? {})) res.setHeader(k, v);
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();

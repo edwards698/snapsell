@@ -5,7 +5,7 @@ links. Everything runs on one server: SQLite, files on disk, and a built-in job 
 Gemini, DevDraft, Resend and WhatsApp.
 
 - **Spec:** [`ecommerce_platform_project_plan.md`](ecommerce_platform_project_plan.md)
-- **Build plan:** [`BUILD_PLAN.md`](BUILD_PLAN.md) (Phases 1–2 are complete)
+- **Build plan:** [`BUILD_PLAN.md`](BUILD_PLAN.md) (Phases 1–4 are complete; payments run in test mode until DevDraft is confirmed)
 - **Prototype:** [`legacy/`](legacy) (the hackathon version, kept for reference until Phase 7)
 
 ## Quick start

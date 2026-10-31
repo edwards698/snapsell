@@ -1,7 +1,7 @@
 'use client';
 
 import { cn, Logo } from '@snapsell/ui';
-import { ShoppingBag } from 'lucide-react';
+import { Search, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useCart } from './cart';
@@ -49,7 +49,24 @@ export function StoreHeader({ shopName }: { shopName: string }) {
         <Link href="/" className="rounded-lg" aria-label={`${shopName} home`}>
           <Logo name={shopName} />
         </Link>
-        <div className="ml-auto flex items-center gap-1">
+        <form action="/" role="search" className="relative ml-auto hidden w-full max-w-xs sm:block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            name="q"
+            type="search"
+            placeholder="Search products"
+            aria-label="Search products"
+            className="h-10 w-full rounded-full border border-border bg-surface pl-9 pr-4 text-sm outline-none transition-shadow focus:border-ring focus:ring-4 focus:ring-ring/15"
+          />
+        </form>
+        <div className="ml-auto flex items-center gap-1 sm:ml-2">
+          <Link
+            href="/?search=1"
+            className="flex size-11 items-center justify-center rounded-full hover:bg-muted sm:hidden"
+            aria-label="Search"
+          >
+            <Search className="size-5" />
+          </Link>
           <CartButton />
         </div>
       </div>

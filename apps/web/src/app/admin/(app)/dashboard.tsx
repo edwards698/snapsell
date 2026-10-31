@@ -20,6 +20,7 @@ import {
   ArrowUpRight,
   Camera,
   ChartColumn,
+  CircleAlert,
   CircleCheck,
   Circle,
   CreditCard,
@@ -35,6 +36,7 @@ import { PageHeader } from '@/components/admin/page-header';
 import { ProductImage } from '@/components/catalog/product-image';
 import { StockBadge } from '@/components/catalog/stock-badge';
 import { useStockSummary } from '@/lib/catalog';
+import { useDashboardStats } from '@/lib/orders';
 import { useOverview, useSessionUser } from '@/components/admin/session';
 
 function greeting(date = new Date()) {
@@ -221,6 +223,7 @@ function LowStockCard() {
 export function Dashboard() {
   const user = useSessionUser();
   const { data, isPending } = useOverview();
+  const { data: stats } = useDashboardStats();
   const firstName = user.name.split(' ')[0];
   const currency = data?.currency ?? 'ZMW';
   const today = new Intl.DateTimeFormat('en-GB', {
@@ -266,20 +269,36 @@ export function Dashboard() {
         >
           <Kpi
             label="Paid sales"
-            value={<Money minor={0} currency={currency} />}
-            hint="Last 30 days"
+            value={
+              <Money
+                minor={stats?.paidSales30dMinor ?? 0}
+                currency={stats?.currency ?? currency}
+                trimZeros
+              />
+            }
+            hint="Last 30 days · verified payments"
             icon={TrendingUp}
           />
           <Kpi
             label="Orders"
-            value={isPending ? '—' : (data?.counts.orders ?? 0)}
-            hint="Website and WhatsApp"
+            value={stats ? stats.orders30d : '—'}
+            hint={stats ? `${stats.paidOrders30d} paid · last 30 days` : 'Website and WhatsApp'}
             icon={Receipt}
           />
           <Kpi
             label="Avg. order"
-            value="—"
-            hint="Appears after your first sale"
+            value={
+              stats?.averageOrderMinor != null ? (
+                <Money minor={stats.averageOrderMinor} currency={stats.currency} trimZeros />
+              ) : (
+                '—'
+              )
+            }
+            hint={
+              stats?.averageOrderMinor != null
+                ? 'Paid orders, last 30 days'
+                : 'Appears after your first sale'
+            }
             icon={ShoppingBag}
           />
           <Kpi label="Chats to orders" value="—" hint="WhatsApp conversion" icon={MessageCircle} />
@@ -304,15 +323,35 @@ export function Dashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Needs attention</CardTitle>
-                <CardDescription>AI drafts, escalations and flagged orders</CardDescription>
+                <CardDescription>Flagged orders and payments</CardDescription>
               </CardHeader>
-              <EmptyState
-                icon={PartyPopper}
-                tone="neutral"
-                title="You’re all caught up"
-                description="Anything that needs a decision from you will show up here."
-                className="py-8 sm:py-10"
-              />
+              {stats?.attention.length ? (
+                <ul className="mt-3 divide-y divide-border border-t border-border">
+                  {stats.attention.map((a) => (
+                    <li key={a.ref}>
+                      <Link
+                        href={`/admin/orders/${a.ref}`}
+                        className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/60 sm:px-6"
+                      >
+                        <CircleAlert className="size-4 shrink-0 text-danger" />
+                        <span className="min-w-0 flex-1 text-sm">
+                          <span className="font-mono font-medium">{a.ref}</span>
+                          <span className="block text-muted-foreground">{a.reason}</span>
+                        </span>
+                        <ArrowRight className="size-4 text-muted-foreground" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState
+                  icon={PartyPopper}
+                  tone="neutral"
+                  title="You’re all caught up"
+                  description="Anything that needs a decision from you will show up here."
+                  className="py-8 sm:py-10"
+                />
+              )}
             </Card>
           </div>
         </div>

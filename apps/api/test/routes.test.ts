@@ -64,10 +64,19 @@ describe('default-deny auth', () => {
     ).toEqual([
       'GET /api/files',
       'GET /api/health',
+      'GET /api/store/categories',
       'GET /api/store/info',
+      'GET /api/store/orders/:ref',
+      'GET /api/store/products',
+      'GET /api/store/products/:slug',
+      'GET /api/test-payments/:linkId',
       'POST /api/admin/auth/forgot-password',
       'POST /api/admin/auth/login',
       'POST /api/admin/auth/reset-password',
+      'POST /api/store/cart/price',
+      'POST /api/store/checkout',
+      'POST /api/test-payments/:linkId/:outcome',
+      'POST /api/webhooks/devdraft',
     ]);
   });
 

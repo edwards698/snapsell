@@ -1,8 +1,8 @@
 # SnapSell – Build Plan
 
 **Source spec:** `ecommerce_platform_project_plan.md` (v2.1)
-**Date:** 2026-10-31 · **Revision:** 4 (Phase 2 built)
-**Status:** Phase 1 ✅ · Phase 2 ✅ · next: Phase 3
+**Date:** 2026-10-31 · **Revision:** 6 (Phase 4 built against recorded DevDraft responses)
+**Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ (pending live DevDraft confirmation) · next: Phase 5
 **Starting point:** hackathon prototype in this folder (`server.js`, `lib/*.js`, `public/*.html`) – Express, JSON-file store, Basic auth, single process.
 **Target:** production-ready v1 as described in the spec – Next.js 16 + NestJS 12 + **SQLite** (Drizzle ORM) + on-server file storage + dedicated WhatsApp service, with a modern, mobile-first UI.
 
@@ -450,20 +450,33 @@ Owner can manage the full catalogue with images on a phone and a laptop; stock c
 
 ## 6. Phase 3 – Storefront, Cart and Checkout
 
+### Status: ✅ complete (2026-10-31)
+
+| Planned | Built | Why / follow-up |
+|---|---|---|
+| "Pay securely" calls Phase 4 link creation | "Place order" creates the order and reserves stock; the order page says a payment link will follow | DevDraft integration is Phase 4. |
+| Expiry job in Phase 4 | `orders.expire` runs every minute now | Without it, unpaid checkouts would hold stock forever. |
+| Lighthouse CI | Not added | Pages are server-rendered with pre-sized AVIF/WebP; add Lighthouse CI with deployment (Phase 8). |
+| – | Checkout sends the total the customer saw; if prices or stock changed, it stops (`PRICE_CHANGED` / `CART_CHANGED`) and returns the re-priced cart | Customers never pay a total they didn't see. |
+| – | Admin **Settings → Shop**: name, collection point, delivery on/off and flat fee, collection on/off, reservation time | Needed to configure checkout (spec §15 delivery default). |
+| – | Customers admin page moved to Phase 4 | It belongs with the orders view. |
+
+Tests added: 6 API tests (visibility rules, cart re-pricing, checkout with tampered price, idempotent retries, customer upsert by phone, out-of-stock refusal, validation, delivery settings, reservation expiry) and a Playwright checkout journey on desktop and mobile.
+
 ### Tasks
-- [ ] Storefront pages per §2.4 (server-rendered with revalidation): home, category, product detail, search.
-- [ ] Cart: client-side (localStorage) holding only `variantId + quantity`; `POST /cart/price` returns trusted lines, totals and availability.
-- [ ] Checkout per §2.4: name, phone (D12), delivery vs collection, address only for delivery.
-- [ ] **`OrderService.createFromCheckout`** (shared with WhatsApp in Phase 7):
+- [x] Storefront pages per §2.4 (server-rendered with revalidation): home, category, product detail, search.
+- [x] Cart: client-side (localStorage) holding only `variantId + quantity`; `POST /cart/price` returns trusted lines, totals and availability.
+- [x] Checkout per §2.4: name, phone (D12), delivery vs collection, address only for delivery.
+- [x] **`OrderService.createFromCheckout`** (shared with WhatsApp in Phase 7):
   1. Re-price every line from the DB; ignore any client-sent price/fee/total.
   2. Compute the delivery fee from `business_settings`.
   3. Upsert customer by `phone_e164`.
   4. In one transaction: insert order + items with snapshots, `reserve()` stock, set `reservation_expires_at`.
   5. Idempotent on a client-generated checkout key (double-tap safe).
-- [ ] Review step before payment; "Pay securely" calls Phase 4 link creation and redirects.
-- [ ] Order status page (`/order/[ref]?t=<status_token>`) with live timeline.
-- [ ] Privacy notice page (spec §11) linked from checkout and the WhatsApp greeting.
-- [ ] Rate limits on public endpoints.
+- [x] Review step before payment; "Pay securely" calls Phase 4 link creation and redirects.
+- [x] Order status page (`/order/[ref]?t=<status_token>`) with live timeline.
+- [x] Privacy notice page (spec §11) linked from checkout and the WhatsApp greeting.
+- [x] Rate limits on public endpoints.
 - [ ] Lighthouse CI on catalogue, product and checkout pages.
 
 ### Tests
@@ -480,29 +493,47 @@ A customer can place a website order without an account in under a minute on a p
 
 ## 7. Phase 4 – Orders, DevDraft Payments and Webhooks
 
+### Status: ✅ built against recorded responses (2026-10-31) – live sign-off waits on Phase 0.1
+
+**From DevDraft's published docs (checked 2026-10-31):** base URL `https://api.devdraft.com` (the prototype's `api.devdraft.ai` was wrong); `POST /api/v0/payment-links` with `x-client-key`, `x-client-secret`, `idempotency-key`; currencies `usdc`, `eurc` only; the response's `url` is a **slug**, not a payment URL; webhooks signed `x-webhook-signature: sha256=<hex HMAC of raw body>`; events `payment.completed` / `payment.failed`. **Not documented:** the customer payment URL, the webhook payload fields, a status endpoint, retries. Fixtures and their provenance: `apps/api/test/fixtures/devdraft/README.md`.
+
+| Planned | Built | Why / follow-up |
+|---|---|---|
+| Real DevDraft sandbox | `DevDraftProvider` built from the docs + `DEVDRAFT_MODE=fake` (local `/pay/test` page that sends DevDraft-style **signed** webhooks through the real verification and processing code) | No credentials yet. Fake mode is refused in production. |
+| Payment URL from the response | `DEVDRAFT_PAYMENT_URL_FIELD` or `DEVDRAFT_PAYMENT_URL_TEMPLATE`, no default; link creation fails loudly if neither is set | Spec §7.2: never construct a URL from an undocumented pattern. |
+| ZMW payments | Orders in a currency not in `DEVDRAFT_CURRENCIES` (default `usdc,eurc`) get no link and are flagged **Needs attention** | Spec §7.5 item 2. |
+| Reconciliation job | Runs only for providers with a status lookup (fake mode); "Check payment status" in the admin | DevDraft's docs don't show one. |
+| Owner notifications | Email on every verified payment (Resend) | WhatsApp notifications arrive with Phase 5. |
+| – | Admin Orders (filters, search, detail with history, fulfilment steps, cancel with restock/refund), Payments (links + webhook log), Customers | Customers page moved here from Phase 3. |
+| – | Webhook events store the matched `order_id` (migration `0004`); payments store `last_error` (`0003`) | Order history without searching payloads. |
+
+Tests added: 9 DevDraft adapter tests (documented request, no invented URL, template, retryable errors, currencies, signature variants, assumed payload parsing, amount conversion, config guards), 14 payment/order flow tests (link reuse, 5 concurrent duplicate webhooks → one sale and one email, bad signatures, amount mismatch, failure keeps reservation, late payment and shortage, unknown/other events, reconciliation, test-mode endpoints, admin list/search/fulfilment/cancel, unsupported currency), Playwright journey extended through payment and fulfilment.
+
+**To go live:** set `DEVDRAFT_MODE=sandbox`, keys, `DEVDRAFT_WEBHOOK_SECRET`, register the webhook URL shown on Integrations, then replace the assumed fixtures with real recordings and adjust `parseDevDraftEvent` / the URL setting if needed.
+
 ### Tasks
 **PaymentProvider (`apps/api/src/payments`)**
-- [ ] `DevDraftProvider.createPaymentLink(order)` using Phase 0 confirmed fields: one-time link, exact backend total, order ref in title/description, return URL to the order status page.
-- [ ] Idempotency: `payments.idempotency_key` generated once per order attempt and reused on retry.
-- [ ] Persist `raw_response`, `provider_link_id`, `payment_url`; set `payment_status = LINK_CREATED`. Fail loudly if the confirmed URL field is missing – no guessing.
-- [ ] Guard: links only for `PENDING_PAYMENT` orders with a live reservation and a total within the per-order limit.
+- [x] `DevDraftProvider.createPaymentLink(order)` using Phase 0 confirmed fields: one-time link, exact backend total, order ref in title/description, return URL to the order status page.
+- [x] Idempotency: `payments.idempotency_key` generated once per order attempt and reused on retry.
+- [x] Persist `raw_response`, `provider_link_id`, `payment_url`; set `payment_status = LINK_CREATED`. Fail loudly if the confirmed URL field is missing – no guessing.
+- [x] Guard: links only for `PENDING_PAYMENT` orders with a live reservation and a total within the per-order limit.
 
 **Webhook endpoint `POST /webhooks/devdraft`**
-- [ ] NestJS `rawBody: true`; verify the signature over the raw bytes per the confirmed algorithm; constant-time compare; reject stale timestamps if supported.
-- [ ] Insert the `webhook_events` row (unique provider event ID) **before** processing; respond 2xx quickly; enqueue a `payments.webhook` job with `dedupeKey = provider_event_id`.
-- [ ] Processor (one transaction):
+- [x] NestJS `rawBody: true`; verify the signature over the raw bytes per the confirmed algorithm; constant-time compare; reject stale timestamps if supported.
+- [x] Insert the `webhook_events` row (unique provider event ID) **before** processing; respond 2xx quickly; enqueue a `payments.webhook` job with `dedupeKey = provider_event_id`.
+- [x] Processor (one transaction):
   - Match by `provider_link_id` / `provider_payment_id` stored on `payments`; verify amount and currency equal the order's.
   - `payment.completed` → `payment_status = PAID`, `status = CONFIRMED`, `commitSale()`, `fulfilment_status = PROCESSING`. The status change uses `UPDATE … WHERE payment_status != 'PAID'` so only one processor can win.
   - `payment.failed` → `payment_status = FAILED`; keep the reservation until expiry so the customer can retry.
   - Duplicate / unknown / mismatched → `IGNORED` with outcome; permanent errors are not retried.
-- [ ] **Late payment:** payment after the reservation expired → try to re-reserve; if stock is gone, mark `PAID` + `needs_attention` for an owner refund/backorder decision. Never silently drop.
-- [ ] **Reconciliation job** (every 10 min, if a status API exists) for orders in `LINK_CREATED` older than N minutes.
-- [ ] **Expiry job** (every minute): expire unpaid orders past `reservation_expires_at` → `release()`, `status = EXPIRED`; expire stale drafts/quotes.
-- [ ] Notifications: owner (dashboard, browser notification, optional email via Resend, optional WhatsApp) and customer (WhatsApp for WhatsApp orders; status page for web).
+- [x] **Late payment:** payment after the reservation expired → try to re-reserve; if stock is gone, mark `PAID` + `needs_attention` for an owner refund/backorder decision. Never silently drop.
+- [x] **Reconciliation job** (every 10 min, if a status API exists) for orders in `LINK_CREATED` older than N minutes.
+- [x] **Expiry job** (every minute): expire unpaid orders past `reservation_expires_at` → `release()`, `status = EXPIRED`; expire stale drafts/quotes.
+- [x] Notifications: owner (dashboard, browser notification, optional email via Resend, optional WhatsApp) and customer (WhatsApp for WhatsApp orders; status page for web).
 
 **Admin orders & payments UI** (per §2.5)
-- [ ] Orders table with filters, saved views, detail drawer with timeline, fulfilment actions showing only allowed transitions, cancel rules (unpaid → cancel + release; paid → cancel requires a refund note).
-- [ ] Payments page: payment records, provider refs, webhook events with outcomes.
+- [x] Orders table with filters, saved views, detail drawer with timeline, fulfilment actions showing only allowed transitions, cancel rules (unpaid → cancel + release; paid → cancel requires a refund note).
+- [x] Payments page: payment records, provider refs, webhook events with outcomes.
 
 ### Tests
 - Signature: valid, invalid, missing header, tampered body (Phase 0 fixtures).

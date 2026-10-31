@@ -1,6 +1,8 @@
 'use client';
 
+import type { PricedCart } from '@snapsell/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { api } from '@/lib/api';
 
 /** The cart holds only variant IDs and quantities; prices always come from the server (BUILD_PLAN Phase 3). */
 export interface CartLine {
@@ -16,6 +18,8 @@ interface CartValue {
   add: (variantId: string, quantity?: number) => void;
   setQuantity: (variantId: string, quantity: number) => void;
   remove: (variantId: string) => void;
+  replace: (lines: CartLine[]) => void;
+  clear: () => void;
 }
 
 const KEY = 'snapsell:cart';
@@ -67,6 +71,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             : lines.map((l) => (l.variantId === variantId ? { ...l, quantity } : l)),
         ),
       remove: (variantId) => persist(lines.filter((l) => l.variantId !== variantId)),
+      replace: (next) => persist(next),
+      clear: () => persist([]),
     }),
     [lines, open, persist],
   );
@@ -78,4 +84,35 @@ export function useCart() {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error('useCart must be used inside <CartProvider>');
   return ctx;
+}
+
+/**
+ * The cart priced by the server (BUILD_PLAN Phase 3: prices never come from the browser).
+ * Re-fetches whenever the lines change.
+ */
+export function usePricedCart() {
+  const { lines } = useCart();
+  const [priced, setPriced] = useState<PricedCart | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const key = JSON.stringify(lines);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const t = setTimeout(() => {
+      api<PricedCart>('/store/cart/price', { json: { items: lines } })
+        .then((r) => !cancelled && (setPriced(r), setError(false)))
+        .catch(() => !cancelled && setError(true))
+        .finally(() => !cancelled && setLoading(false));
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // `key` captures the lines' contents.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return { priced, loading, error, setPriced };
 }

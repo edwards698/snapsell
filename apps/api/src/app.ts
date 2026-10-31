@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { join } from 'node:path';
-import { type INestApplication } from '@nestjs/common';
+import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';
@@ -27,8 +27,12 @@ export async function createApp(config: AppConfig): Promise<INestApplication> {
     },
     crossOriginResourcePolicy: { policy: 'same-site' },
   });
-  // Fetch-Metadata cross-origin protection (Nest 12). Webhooks from providers will be excluded here.
-  app.enableCsrfProtection({ trustedOrigins: [new URL(config.publicWebUrl).origin] });
+  // Fetch-Metadata cross-origin protection (Nest 12). Provider webhooks are server-to-server and
+  // authenticated by their signature instead.
+  app.enableCsrfProtection({
+    trustedOrigins: [new URL(config.publicWebUrl).origin],
+    exclude: [{ path: 'webhooks/devdraft', method: RequestMethod.POST }],
+  });
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
 

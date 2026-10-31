@@ -1,0 +1,12 @@
+{
+  "id": "evt_01HZX3K9Q4WQ5V7Y8M2N6P0R1S",
+  "type": "payment.completed",
+  "createdAt": "2026-10-31T12:00:00Z",
+  "data": {
+    "id": "pay_7d1f0c2e-1b8a-4c55-9a0f-3e2d1c0b9a87",
+    "paymentLinkId": "550e8400-e29b-41d4-a716-446655440000",
+    "amount": 29.99,
+    "currency": "usdc",
+    "status": "COMPLETED"
+  }
+}

@@ -29,6 +29,6 @@ import { SnapService } from './snap.service.js';
     InventoryService,
     SnapService,
   ],
-  exports: [ProductsService, InventoryService, CategoriesService],
+  exports: [ProductsService, InventoryService, CategoriesService, ProductImageService],
 })
 export class CatalogModule {}

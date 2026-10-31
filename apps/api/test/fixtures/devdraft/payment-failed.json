@@ -1,0 +1,12 @@
+{
+  "id": "evt_01HZX3M2B7C8D9E0F1G2H3J4K5",
+  "type": "payment.failed",
+  "createdAt": "2026-10-31T12:01:00Z",
+  "data": {
+    "id": "pay_0a9b8c7d-6e5f-4a3b-2c1d-0e9f8a7b6c5d",
+    "paymentLinkId": "550e8400-e29b-41d4-a716-446655440000",
+    "amount": 29.99,
+    "currency": "usdc",
+    "status": "FAILED"
+  }
+}
