@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm typecheck
+      # Unit + integration tests; migrations are applied to a temporary SQLite file per test.
+      - run: pnpm test
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @snapsell/web exec playwright install --with-deps chromium
+      # Screenshot baselines are recorded on macOS; font rendering differs on Linux, so CI runs
+      # the end-to-end flows and skips pixel comparisons. Run `pnpm --filter @snapsell/web test:e2e`
+      # locally for the full visual check.
+      - name: End-to-end tests
+        run: pnpm --filter @snapsell/web exec playwright test --ignore-snapshots
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/test-results
+          retention-days: 7

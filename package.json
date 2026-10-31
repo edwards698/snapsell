@@ -1,0 +1,31 @@
+{
+  "name": "snapsell",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "db:generate": "pnpm --filter @snapsell/db generate",
+    "db:migrate": "pnpm --filter @snapsell/db migrate",
+    "reset-owner-password": "pnpm --filter @snapsell/api reset-owner-password",
+    "setup": "node scripts/setup.mjs",
+    "seed": "pnpm --filter @snapsell/api seed"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.6.2",
+    "turbo": "^2.11.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.72.1"
+  }
+}

@@ -1,0 +1,4 @@
+@import 'tailwindcss';
+@import '@snapsell/ui/tokens.css';
+
+@source '../../../../packages/ui/src';

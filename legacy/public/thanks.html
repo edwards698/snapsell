@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order status</title>
+<style>body{font:16px system-ui,sans-serif;background:#f6f4ef;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px}
+.c{background:#fff;border:1px solid #e4e1d8;border-radius:16px;padding:28px;max-width:420px;text-align:center}.ok{color:#0f7b5f}</style></head>
+<body><div class="c"><h2 id="h">Checking payment…</h2><p id="p">This updates automatically once the payment is verified.</p><a href="/">Back to shop</a></div>
+<script>
+const ref=new URLSearchParams(location.search).get('ref');
+async function poll(){ if(!ref) return; const r=await fetch('/api/orders/'+encodeURIComponent(ref)+'/status').then(r=>r.json());
+  if(r.paymentStatus==='PAID'){ document.getElementById('h').innerHTML='<span class="ok">✅ Paid</span>'; document.getElementById('p').textContent=`Order ${r.ref} · $${r.total}. Thank you!`; return; }
+  document.getElementById('p').textContent=`Order ${ref}: ${r.paymentStatus||'waiting'}. Waiting for payment confirmation…`; setTimeout(poll,3000); }
+poll();
+</script></body></html>

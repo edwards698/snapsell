@@ -1,0 +1,14 @@
+{
+  "extends": "@snapsell/config/tsconfig.node.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "declaration": false,
+    "isolatedModules": false,
+    "strictPropertyInitialization": false,
+    "types": ["node", "multer"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

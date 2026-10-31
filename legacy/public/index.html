@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SnapSell Shop</title>
+<style>
+  :root{--bg:#f6f4ef;--card:#fff;--ink:#1d1d1b;--muted:#6b6a65;--accent:#0f7b5f;--accent2:#e8f4ef;--line:#e4e1d8}
+  *{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+  header{padding:18px 16px;display:flex;justify-content:space-between;align-items:center;max-width:1000px;margin:auto}
+  h1{font-size:20px;margin:0}h1 span{color:var(--accent)}
+  main{max-width:1000px;margin:auto;padding:0 16px 120px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .card img{width:100%;aspect-ratio:1;object-fit:cover;background:#eee}
+  .card .b{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .price{font-weight:700;color:var(--accent)}.muted{color:var(--muted);font-size:13px}
+  button{font:inherit;border:0;border-radius:10px;padding:10px 14px;background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:var(--accent2);color:var(--accent)}button:disabled{opacity:.5}
+  input,textarea{font:inherit;width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .sheet{position:fixed;inset:auto 0 0 0;background:#fff;border-top:1px solid var(--line);padding:16px;max-height:80vh;overflow:auto;display:none;box-shadow:0 -8px 30px #0002}
+  .sheet.open{display:block}.row{display:flex;gap:8px;align-items:center}
+  #chatBtn{position:fixed;right:16px;bottom:16px;border-radius:999px;padding:14px 18px;box-shadow:0 6px 20px #0003}
+  #chat{position:fixed;right:16px;bottom:76px;width:min(380px,calc(100vw - 32px));height:min(520px,70vh);background:#fff;border:1px solid var(--line);border-radius:16px;display:none;flex-direction:column;box-shadow:0 10px 40px #0003}
+  #chat.open{display:flex}#log{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .m{max-width:85%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;word-break:break-word}
+  .m.user{align-self:flex-end;background:var(--accent);color:#fff}.m.assistant,.m.owner{align-self:flex-start;background:var(--accent2)}
+  .m a{color:inherit}#chat form{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line)}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<header><h1>Snap<span>Sell</span> <span class="muted" id="biz"></span></h1><button class="ghost" id="cartBtn">Cart (0)</button></header>
+<main><div class="grid" id="grid"></div></main>
+
+<div class="sheet" id="sheet">
+  <h3 style="margin-top:0">Your order</h3><div id="lines"></div>
+  <p><b>Total: $<span id="total">0.00</span></b> <span class="muted">(final total is checked by the shop)</span></p>
+  <div style="display:grid;gap:8px">
+    <input id="name" placeholder="Full name *"><input id="phone" placeholder="Phone number * e.g. 260971234567">
+    <input id="address" placeholder="Delivery address (optional)">
+    <div class="row"><button id="pay">Get payment link</button><button class="ghost" id="close">Close</button></div>
+    <div id="msg" class="muted"></div>
+  </div>
+</div>
+
+<button id="chatBtn">💬 Chat to order</button>
+<div id="chat"><div id="log"></div>
+  <form id="f"><label class="ghost" style="cursor:pointer;padding:10px">📷<input type="file" id="img" accept="image/*" hidden></label>
+  <input id="t" placeholder="Ask about a product…" autocomplete="off"><button>Send</button></form></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const cart = new Map(); let products = [];
+const sid = (()=>{ try{ let v=localStorage.getItem('sid'); if(!v){v=crypto.randomUUID();localStorage.setItem('sid',v);} return v;}catch{return crypto.randomUUID();} })();
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load(){
+  products = await fetch('/api/products').then(r=>r.json());
+  $('#grid').innerHTML = products.length ? products.map(p=>`
+    <div class="card">${p.image?`<img src="${p.image}" alt="">`:''}
+      <div class="b"><b>${esc(p.name)}</b><span class="muted">${esc(p.caption||p.description)}</span>
+      <span class="price">$${p.price.toFixed(2)}</span><span class="muted">${p.stock} in stock</span>
+      <button data-id="${p.id}">Add to order</button></div></div>`).join('') : '<div class="empty">No products yet. The seller adds them from the dashboard.</div>';
+}
+$('#grid').onclick = e => { const id=e.target.dataset.id; if(!id) return; cart.set(id,(cart.get(id)||0)+1); render(); };
+function render(){
+  let n=0,t=0; $('#lines').innerHTML=[...cart].map(([id,q])=>{const p=products.find(x=>x.id===id); n+=q; t+=p.price*q;
+    return `<div class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(p.name)}</span>
+    <span class="row"><button class="ghost" data-d="${id}">−</button>${q}<button class="ghost" data-i="${id}">+</button></span></div>`}).join('');
+  $('#total').textContent=t.toFixed(2); $('#cartBtn').textContent=`Cart (${n})`;
+}
+$('#lines').onclick=e=>{const d=e.target.dataset.d,i=e.target.dataset.i;
+  if(i){const p=products.find(x=>x.id===i); cart.set(i,Math.min(p.stock,cart.get(i)+1));}
+  if(d){const q=cart.get(d)-1; q>0?cart.set(d,q):cart.delete(d);} render();};
+$('#cartBtn').onclick=()=>$('#sheet').classList.add('open'); $('#close').onclick=()=>$('#sheet').classList.remove('open');
+$('#pay').onclick=async()=>{
+  $('#pay').disabled=true; $('#msg').textContent='Creating your order…';
+  const r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    items:[...cart].map(([product_id,quantity])=>({product_id,quantity})),name:$('#name').value,phone:$('#phone').value,address:$('#address').value})}).then(r=>r.json());
+  $('#pay').disabled=false;
+  if(r.error) return $('#msg').textContent=r.error;
+  $('#msg').innerHTML = r.paymentUrl ? `Order <b>${r.ref}</b> · $${r.total}. <a href="${r.paymentUrl}" target="_blank" rel="noopener">Pay now →</a>` : `Order ${r.ref} created; payment link pending.`;
+  cart.clear(); render();
+};
+
+// ---- chat ----
+$('#chatBtn').onclick=()=>{$('#chat').classList.toggle('open'); if(!$('#log').children.length) add('assistant','Hi! Ask me about anything in the shop, or send a photo of what you want.');};
+function add(role,text){ const d=document.createElement('div'); d.className='m '+role;
+  d.innerHTML=esc(text).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>'); $('#log').append(d); $('#log').scrollTop=1e9; return d;}
+async function shrink(file){ const img=await createImageBitmap(file); const s=Math.min(1,900/Math.max(img.width,img.height));
+  const c=document.createElement('canvas'); c.width=img.width*s; c.height=img.height*s; c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',.82).split(',')[1]; }
+async function send(text,media=[]){
+  add('user', text || '📷 photo'); const w=add('assistant','…');
+  try{ const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:sid,text,media})}).then(r=>r.json());
+    w.remove(); if(r.reply) add('assistant',r.reply); else if(r.error) add('assistant','Error: '+r.error); else add('assistant','The shop owner will reply shortly.');
+  }catch(e){ w.remove(); add('assistant','Network error'); }
+}
+$('#f').onsubmit=e=>{e.preventDefault(); const t=$('#t').value.trim(); if(!t) return; $('#t').value=''; send(t);};
+$('#img').onchange=async e=>{const f=e.target.files[0]; if(!f) return; const data=await shrink(f); send($('#t').value.trim(),[{mime:'image/jpeg',data}]); $('#t').value=''; e.target.value='';};
+load();
+</script>
+</body>
+</html>

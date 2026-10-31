@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SnapSell Dashboard</title>
+<style>
+  :root{--bg:#f3f2ee;--card:#fff;--ink:#1b1b19;--muted:#6b6a65;--accent:#0f7b5f;--soft:#e8f4ef;--line:#e2dfd6;--warn:#b5481d;--warnsoft:#fbeee7}
+  *{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;flex-wrap:wrap}
+  h1{font-size:18px;margin:0}h1 span{color:var(--accent)}h2{font-size:15px;margin:0 0 10px}
+  nav{display:flex;gap:4px;flex-wrap:wrap}nav button{background:transparent;color:var(--muted)}nav button.on{background:var(--soft);color:var(--accent)}
+  main{max-width:1200px;margin:auto;padding:16px}section{display:none}section.on{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  button{font:inherit;border:0;border-radius:9px;padding:8px 12px;background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:var(--soft);color:var(--accent)}button.warn{background:var(--warnsoft);color:var(--warn)}button:disabled{opacity:.5}
+  input,textarea,select{font:inherit;width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;background:#fff}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.two,.inbox{grid-template-columns:1fr!important}}
+  table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:12px;color:var(--muted);font-weight:600}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:var(--soft);color:var(--accent)}
+  .pill.no{background:var(--warnsoft);color:var(--warn)}.muted{color:var(--muted)}
+  #preview{width:100%;max-height:260px;object-fit:contain;border-radius:10px;background:#f6f6f3;display:none}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}.stat b{display:block;font-size:22px}
+  .inbox{display:grid;grid-template-columns:260px 1fr;gap:14px;min-height:60vh}
+  .clist div{padding:10px;border-bottom:1px solid var(--line);cursor:pointer}.clist div.on{background:var(--soft)}
+  .msgs{height:52vh;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:6px}
+  .m{max-width:80%;padding:7px 10px;border-radius:10px;white-space:pre-wrap;word-break:break-word}
+  .m.user{background:#eee;align-self:flex-start}.m.assistant{background:var(--soft);align-self:flex-end}.m.owner{background:#dfe9ff;align-self:flex-end}.m.system{align-self:center;font-size:12px;color:var(--muted)}
+  .thumb{width:44px;height:44px;object-fit:cover;border-radius:8px}
+  #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1b1b19;color:#fff;padding:10px 14px;border-radius:10px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Snap<span>Sell</span> · Seller</h1>
+  <nav id="nav">
+    <button data-s="snap" class="on">📸 Snap</button><button data-s="products">Products</button><button data-s="orders">Orders</button>
+    <button data-s="inbox">Inbox</button><button data-s="settings">Settings</button>
+  </nav>
+</header>
+<main>
+  <div class="stats" id="stats" style="margin-bottom:14px"></div>
+
+  <section id="snap" class="on"><div class="two">
+    <div class="card"><h2>1 · Snap the product</h2>
+      <input type="file" id="photo" accept="image/*" capture="environment">
+      <img id="preview" alt="">
+      <label>Voice note (optional, mp3/ogg/wav/m4a)</label><input type="file" id="audio" accept="audio/*">
+      <label>Or type a note: name, price, how many</label><input id="note" placeholder="e.g. Blue chitenge, $2, 5 pieces">
+      <p><button id="extract">✨ Fill with AI</button> <span id="exMsg" class="muted"></span></p>
+    </div>
+    <div class="card"><h2>2 · Check and publish</h2>
+      <label>Name</label><input id="pName"><label>Description</label><textarea id="pDesc" rows="2"></textarea>
+      <div class="two"><div><label>Price (USD, max 5)</label><input id="pPrice" type="number" step="0.01" min="0.5" max="5"></div>
+      <div><label>Stock</label><input id="pStock" type="number" min="0" value="1"></div></div>
+      <label>WhatsApp caption</label><input id="pCap">
+      <p><button id="publish">Publish product</button> <span id="pubMsg" class="muted"></span></p>
+    </div></div></section>
+
+  <section id="products"><div class="card"><h2>Catalogue</h2><table id="ptable"></table></div></section>
+
+  <section id="orders"><div class="card"><h2>Orders</h2><table id="otable"></table></div>
+    <div class="card"><h2>Payment webhooks</h2><table id="etable"></table></div></section>
+
+  <section id="inbox"><div class="inbox">
+    <div class="card clist" id="clist" style="padding:0;overflow:auto"></div>
+    <div class="card"><div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <h2 id="ctitle" style="margin:0">Select a chat</h2><span id="cmode"></span></div>
+      <div class="msgs" id="msgs"></div>
+      <form id="rf" style="display:flex;gap:6px"><input id="rt" placeholder="Reply as owner (takes over from AI)"><button>Send</button></form>
+    </div></div></section>
+
+  <section id="settings"><div class="two">
+    <div class="card"><h2>AI assistant</h2><p><label style="display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)"><input type="checkbox" id="ai" style="width:auto"> AI replies enabled (global)</label></p>
+      <p class="muted" id="limits"></p>
+      <p><button class="ghost" id="testLink">Create $ test payment link (first product)</button></p><p id="testOut" class="muted" style="word-break:break-all"></p>
+      <p><button class="ghost" id="ddHealth">Check DevDraft connection</button> <span id="ddOut" class="muted"></span></p></div>
+    <div class="card"><h2>WhatsApp</h2><p id="wa" class="muted">…</p><img id="qr" style="display:none;width:240px" alt="WhatsApp QR"></div>
+  </div></section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), api=(u,o={})=>fetch(u,{headers:{'Content-Type':'application/json'},...o}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j;});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=t=>{const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',3000);};
+let imgData=null, current=null;
+
+$('#nav').onclick=e=>{const s=e.target.dataset.s;if(!s)return;document.querySelectorAll('nav button,section').forEach(x=>x.classList.remove('on'));e.target.classList.add('on');$('#'+s).classList.add('on');refresh();};
+
+async function shrink(file){const img=await createImageBitmap(file);const s=Math.min(1,900/Math.max(img.width,img.height));
+  const c=document.createElement('canvas');c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.82);}
+const b64=f=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result.split(',')[1]);fr.readAsDataURL(f);});
+
+$('#photo').onchange=async e=>{const f=e.target.files[0];if(!f)return;imgData=await shrink(f);$('#preview').src=imgData;$('#preview').style.display='block';};
+$('#extract').onclick=async()=>{
+  const af=$('#audio').files[0]; if(!imgData&&!af&&!$('#note').value) return toast('Add a photo, voice note or note');
+  $('#extract').disabled=true;$('#exMsg').textContent='Thinking…';
+  try{const r=await api('/api/admin/snap',{method:'POST',body:JSON.stringify({imageBase64:imgData?.split(',')[1],note:$('#note').value,
+      audioBase64:af?await b64(af):undefined,audioMime:af?.type?.split(';')[0]})});
+    $('#pName').value=r.name||'';$('#pDesc').value=r.description||'';$('#pPrice').value=r.price_usd??'';$('#pStock').value=r.quantity??1;$('#pCap').value=r.caption||'';
+    $('#exMsg').textContent=r.price_usd==null?'Set a price before publishing.':'Check the details, then publish.';
+  }catch(e){$('#exMsg').textContent='AI error: '+e.message;} $('#extract').disabled=false;};
+$('#publish').onclick=async()=>{
+  try{await api('/api/admin/products',{method:'POST',body:JSON.stringify({name:$('#pName').value,description:$('#pDesc').value,price:$('#pPrice').value,stock:$('#pStock').value,caption:$('#pCap').value,image:imgData})});
+    toast('Published ✅');['pName','pDesc','pPrice','pCap','note'].forEach(i=>$('#'+i).value='');imgData=null;$('#preview').style.display='none';$('#photo').value='';$('#audio').value='';refresh();
+  }catch(e){$('#pubMsg').textContent=e.message;}};
+
+async function refresh(){
+  const [prods,orders,set]=await Promise.all([api('/api/admin/products'),api('/api/admin/orders'),api('/api/admin/settings')]);
+  const paid=orders.filter(o=>o.paymentStatus==='PAID');
+  $('#stats').innerHTML=[['Paid sales','$'+paid.reduce((s,o)=>s+o.total,0).toFixed(2)],['Orders',orders.length],['Unpaid',orders.filter(o=>o.paymentStatus!=='PAID').length],
+    ['Links created','$'+set.totals.linkedUsd.toFixed(2)+' / $'+set.limits.total],['Low stock',prods.filter(p=>p.stock<=1).length]].map(([k,v])=>`<div class="stat"><span class="muted">${k}</span><b>${v}</b></div>`).join('');
+  $('#ptable').innerHTML='<tr><th></th><th>Product</th><th>Price</th><th>Stock</th><th></th></tr>'+prods.map(p=>`<tr><td>${p.image?`<img class="thumb" src="${p.image}">`:''}</td>
+    <td><b>${esc(p.name)}</b><div class="muted">${esc(p.caption)}</div></td><td>$${p.price.toFixed(2)}</td>
+    <td><input type="number" value="${p.stock}" style="width:70px" data-stock="${p.id}"></td>
+    <td><button class="${p.active?'warn':'ghost'}" data-toggle="${p.id}" data-a="${p.active}">${p.active?'Hide':'Show'}</button></td></tr>`).join('');
+  $('#otable').innerHTML='<tr><th>Ref</th><th>Channel</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Link</th></tr>'+orders.map(o=>`<tr>
+    <td><b>${o.ref}</b><div class="muted">${new Date(o.createdAt).toLocaleTimeString()}</div></td><td>${o.channel}</td>
+    <td>${esc(o.customer.name)}<div class="muted">${esc(o.customer.phone)}</div></td><td>${o.lines.map(l=>`${l.quantity}× ${esc(l.name)}`).join('<br>')}</td>
+    <td>$${o.total.toFixed(2)}</td><td><span class="pill ${o.paymentStatus==='PAID'?'':'no'}">${o.paymentStatus}</span></td>
+    <td>${o.payment?.url?`<a href="${o.payment.url}" target="_blank" rel="noopener">open</a>`:`<button class="ghost" data-link="${o.ref}">Create</button>`}</td></tr>`).join('');
+  const ev=await api('/api/admin/events');
+  $('#etable').innerHTML='<tr><th>Time</th><th>Type</th><th>Verified</th><th>Order</th><th>Outcome</th></tr>'+ev.map(e=>`<tr><td>${new Date(e.at).toLocaleTimeString()}</td><td>${esc(e.type)}</td><td>${e.verified?'✅':'❌ '+esc(e.reason)}</td><td>${e.orderRef||''}</td><td>${esc(e.outcome)}</td></tr>`).join('');
+  $('#ai').checked=set.aiEnabled;$('#limits').textContent=`Limits: $${set.limits.perTx} per payment, $${set.limits.total} total. Links created so far: $${set.totals.linkedUsd}.`;
+  loadInbox(); loadWA();
+}
+$('#ptable').onchange=async e=>{const id=e.target.dataset.stock;if(id){await api('/api/admin/products/'+id,{method:'PATCH',body:JSON.stringify({stock:+e.target.value})});toast('Stock updated');}};
+$('#ptable').onclick=async e=>{const id=e.target.dataset.toggle;if(id){await api('/api/admin/products/'+id,{method:'PATCH',body:JSON.stringify({active:e.target.dataset.a!=='true'})});refresh();}};
+$('#otable').onclick=async e=>{const ref=e.target.dataset.link;if(!ref)return;try{await api(`/api/admin/orders/${ref}/link`,{method:'POST'});refresh();}catch(err){toast(err.message);}};
+
+async function loadInbox(){
+  const cs=await api('/api/admin/conversations');
+  $('#clist').innerHTML=cs.map(c=>`<div data-p="${esc(c.phone)}" class="${c.phone===current?'on':''}"><b>${esc(c.name||c.phone)}</b> <span class="pill ${c.mode==='AI_AUTO'?'':'no'}">${c.mode==='AI_AUTO'?'AI':'You'}</span>
+    <div class="muted">${esc((c.messages.at(-1)||{}).text||'').slice(0,50)}</div></div>`).join('')||'<p class="muted" style="padding:12px">No chats yet</p>';
+  const c=cs.find(x=>x.phone===current); if(!c) return;
+  $('#ctitle').textContent=c.name||c.phone;
+  $('#cmode').innerHTML=c.mode==='AI_AUTO'?`<button class="warn" data-mode="HUMAN">✋ Take over</button>`:`<button class="ghost" data-mode="AI_AUTO">🤖 Hand back to AI</button>`;
+  $('#msgs').innerHTML=c.messages.map(m=>`<div class="m ${m.role}">${esc(m.text)}${m.tools?.length?`<div class="muted" style="font-size:11px">tools: ${m.tools.join(', ')}</div>`:''}</div>`).join('');$('#msgs').scrollTop=1e9;
+}
+$('#clist').onclick=e=>{const d=e.target.closest('[data-p]');if(d){current=d.dataset.p;loadInbox();}};
+$('#cmode').onclick=async e=>{const m=e.target.dataset.mode;if(m&&current){await api(`/api/admin/conversations/${encodeURIComponent(current)}/mode`,{method:'POST',body:JSON.stringify({mode:m})});loadInbox();}};
+$('#rf').onsubmit=async e=>{e.preventDefault();if(!current||!$('#rt').value)return;try{await api(`/api/admin/conversations/${encodeURIComponent(current)}/reply`,{method:'POST',body:JSON.stringify({text:$('#rt').value})});$('#rt').value='';loadInbox();}catch(err){toast(err.message);}};
+
+async function loadWA(){const w=await api('/api/admin/whatsapp');$('#wa').textContent=`Status: ${w.status}${w.number?' · +'+w.number:''}${w.error?' · '+w.error:''}`;
+  $('#qr').style.display=w.qr?'block':'none';if(w.qr)$('#qr').src=w.qr;}
+$('#ai').onchange=async e=>{await api('/api/admin/settings',{method:'POST',body:JSON.stringify({aiEnabled:e.target.checked})});toast('Saved');};
+$('#testLink').onclick=async()=>{$('#testOut').textContent='Creating…';try{const r=await api('/api/admin/test-link',{method:'POST'});$('#testOut').innerHTML=r.url?`${r.ref}: <a href="${r.url}" target="_blank" rel="noopener">${r.url}</a>`:'Created, but no URL field found. Raw: '+esc(JSON.stringify(r.raw).slice(0,300));refresh();}catch(e){$('#testOut').textContent=e.message;}};
+$('#ddHealth').onclick=async()=>{try{$('#ddOut').textContent=JSON.stringify(await api('/api/admin/devdraft-health')).slice(0,120);}catch(e){$('#ddOut').textContent=e.message;}};
+
+refresh(); setInterval(()=>{ if(!document.hidden) refresh(); },4000);
+</script>
+</body>
+</html>

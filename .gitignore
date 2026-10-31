@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+data/
+.wwebjs_auth/
+.wwebjs_cache/
+*.log
+.DS_Store
+test-results/
+playwright-report/
+.e2e-data/
