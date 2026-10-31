@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { ComingSoon } from '@/components/admin/coming-soon';
+import { AiPage } from './ai-page';
 
 export const metadata: Metadata = { title: 'AI Assistant' };
 
 export default function Page() {
-  return <ComingSoon href="/admin/ai" />;
+  return <AiPage />;
 }

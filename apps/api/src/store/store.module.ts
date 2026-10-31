@@ -1,10 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { CatalogModule } from '../catalog/catalog.module.js';
 import { APP_CONFIG } from '../config/config.module.js';
 import { type AppConfig } from '../config/config.js';
+import { MessagingModule } from '../messaging/messaging.module.js';
 import { OrdersAdminController } from '../orders/orders-admin.controller.js';
 import { OrdersAdminService } from '../orders/orders-admin.service.js';
 import { OrdersService } from '../orders/orders.service.js';
+import { WhatsAppOrdersService } from '../orders/whatsapp-orders.service.js';
 import { DevDraftProvider } from '../payments/devdraft.provider.js';
 import { FakePaymentProvider } from '../payments/fake.provider.js';
 import { PAYMENT_PROVIDER } from '../payments/payment.provider.js';
@@ -16,11 +18,12 @@ import { StorefrontService } from './storefront.service.js';
 
 /** Storefront, orders and payments: everything between a cart and a paid order. */
 @Module({
-  imports: [CatalogModule],
+  imports: [CatalogModule, forwardRef(() => MessagingModule)],
   controllers: [StoreController, ShopSettingsController, OrdersAdminController, WebhooksController],
   providers: [
     StorefrontService,
     OrdersService,
+    WhatsAppOrdersService,
     OrdersAdminService,
     PaymentsService,
     {
@@ -32,6 +35,6 @@ import { StorefrontService } from './storefront.service.js';
           : new DevDraftProvider(c.devdraft),
     },
   ],
-  exports: [OrdersService, StorefrontService, PaymentsService],
+  exports: [OrdersService, WhatsAppOrdersService, StorefrontService, PaymentsService],
 })
 export class StoreModule {}

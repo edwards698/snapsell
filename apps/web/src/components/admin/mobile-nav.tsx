@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { isActive, MOBILE_TABS, NAV, navItem } from '@/lib/nav';
+import { UnreadBadge } from './unread-badge';
 
 /** Bottom tab bar for phones (BUILD_PLAN §2.5): Home · Orders · Inbox · Products · More. */
 export function MobileNav() {
@@ -42,11 +43,14 @@ export function MobileNav() {
                 >
                   <span
                     className={cn(
-                      'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
+                      'relative flex h-7 w-12 items-center justify-center rounded-full transition-colors',
                       active && 'bg-primary-soft',
                     )}
                   >
                     <tab.icon className="size-5" aria-hidden />
+                    {tab.href === '/admin/inbox' && (
+                      <UnreadBadge className="absolute -top-1.5 right-0.5 ring-2 ring-surface" />
+                    )}
                   </span>
                   {tab.href === '/admin' ? 'Home' : tab.label}
                 </Link>

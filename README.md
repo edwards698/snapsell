@@ -48,7 +48,7 @@ Snap to sell needs `GEMINI_API_KEY`; everything else in the catalogue works with
 | `pnpm --filter @snapsell/web test:e2e` | Playwright end-to-end + screenshot tests (builds and starts its own servers on :3100/:4100) |
 | `pnpm --filter @snapsell/web test:e2e:update` | Re-record screenshot baselines after an intended UI change |
 | `pnpm db:generate` | Create a migration after editing `packages/db/src/schema.ts` |
-| `pnpm seed` | Sample catalogue for development (skips if products exist; `--force` to add anyway) |
+| `pnpm seed` | Sample catalogue (stationery, cables, chargers, laptops, phones). Skips if products exist; `--force` to add alongside; `--replace` to wipe and reseed |
 | `pnpm reset-owner-password` | Break-glass owner password reset (or creates the owner if none exists) |
 
 ## How requests flow

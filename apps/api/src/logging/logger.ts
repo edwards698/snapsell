@@ -19,6 +19,18 @@ export const REDACT_PATHS = [
   '*.token',
   '*.apiKey',
   '*.secret',
+  // WhatsApp data (Phase 5): customer numbers, message text and the linking QR code.
+  'phone',
+  '*.phone',
+  'phoneE164',
+  '*.phoneE164',
+  'chatId',
+  '*.chatId',
+  'body',
+  '*.body',
+  'qr',
+  '*.qr',
+  'req.headers["x-snapsell-signature"]',
 ];
 
 export function createLogger(config: AppConfig): Logger {

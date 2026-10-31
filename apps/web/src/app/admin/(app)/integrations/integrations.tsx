@@ -1,9 +1,12 @@
 'use client';
 
 import { Badge, Card, CardContent, CardDescription, CardTitle, Skeleton } from '@snapsell/ui';
-import { CreditCard, Mail, MessageCircle, TriangleAlert } from 'lucide-react';
+import { CreditCard, Mail, MessageCircle } from 'lucide-react';
 import { PageHeader } from '@/components/admin/page-header';
 import { useSystemStatus } from '@/components/admin/session';
+import { whatsappLabel } from '@/components/admin/status-pills';
+import { useWhatsAppStatus } from '@/lib/inbox';
+import { WhatsAppDetail } from './whatsapp-detail';
 
 interface Row {
   icon: typeof Mail;
@@ -37,6 +40,8 @@ function IntegrationCard({ icon: Icon, name, description, badge, detail }: Row) 
 
 export function Integrations() {
   const { data, isPending } = useSystemStatus();
+  const { data: wa } = useWhatsAppStatus();
+  const waLabel = whatsappLabel(wa);
   const resend = data?.email.provider === 'resend';
   const devdraft = data?.integrations.find((i) => i.kind === 'DEVDRAFT');
   const webhookUrl =
@@ -129,17 +134,12 @@ export function Integrations() {
             icon={MessageCircle}
             name="WhatsApp"
             description="Link the shop's number by scanning a QR code, like WhatsApp Web."
-            badge={<Badge tone="outline">Phase 5</Badge>}
-            detail={
-              <span className="flex gap-2">
-                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
-                <span>
-                  This uses an unofficial WhatsApp Web connection. WhatsApp may restrict numbers
-                  that use it, so a dedicated business number is recommended. You’ll be asked to
-                  accept this before linking.
-                </span>
-              </span>
+            badge={
+              <Badge tone={waLabel.tone} dot pulse={waLabel.tone === 'warning'}>
+                {waLabel.label}
+              </Badge>
             }
+            detail={wa ? <WhatsAppDetail status={wa} /> : <Skeleton className="h-10" />}
           />
         </div>
       )}

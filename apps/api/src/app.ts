@@ -27,11 +27,20 @@ export async function createApp(config: AppConfig): Promise<INestApplication> {
     },
     crossOriginResourcePolicy: { policy: 'same-site' },
   });
-  // Fetch-Metadata cross-origin protection (Nest 12). Provider webhooks are server-to-server and
-  // authenticated by their signature instead.
+  // Fetch-Metadata cross-origin protection (Nest 12). Provider webhooks and the WhatsApp service
+  // are server-to-server and authenticated by their signature instead.
   app.enableCsrfProtection({
     trustedOrigins: [new URL(config.publicWebUrl).origin],
-    exclude: [{ path: 'webhooks/devdraft', method: RequestMethod.POST }],
+    exclude: [
+      { path: 'webhooks/devdraft', method: RequestMethod.POST },
+      { path: 'internal/wa/events', method: RequestMethod.POST },
+      { path: 'internal/wa/media', method: RequestMethod.POST },
+    ],
+  });
+  // WhatsApp media arrives as raw bytes from the WhatsApp service.
+  app.useBodyParser('raw', {
+    type: 'application/octet-stream',
+    limit: config.uploads.maxBytes + 1024,
   });
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();

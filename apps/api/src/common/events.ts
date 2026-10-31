@@ -1,11 +1,18 @@
 import { EventEmitter } from 'node:events';
 import { Global, Injectable, Module } from '@nestjs/common';
+import type { RealtimeEvents } from '@snapsell/shared';
 
-/** In-process domain events. Phase 5 forwards these to the admin over Socket.IO. */
-export interface DomainEvents {
-  'stock.changed': { variantIds: string[] };
-  'catalog.changed': { productId: string };
-}
+/** In-process domain events. The realtime gateway forwards them to the admin over Socket.IO. */
+export type DomainEvents = RealtimeEvents;
+
+export const DOMAIN_EVENTS = [
+  'message.new',
+  'message.updated',
+  'conversation.updated',
+  'whatsapp.status',
+  'stock.changed',
+  'catalog.changed',
+] as const satisfies ReadonlyArray<keyof DomainEvents>;
 
 @Injectable()
 export class EventBus {

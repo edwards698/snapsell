@@ -7,18 +7,24 @@ import {
   type PaymentProvider,
 } from './payment.provider.js';
 
+type FakeLink = {
+  amountMinor: number;
+  currency: string;
+  status: 'pending' | 'paid' | 'failed';
+};
+
 /**
- * Development stand-in for DevDraft. Links point at the local /pay/test page, and "paying" there
- * sends a webhook signed exactly like DevDraft's to our own endpoint, so the real verification and
- * processing code runs end to end. Refused in production by the config loader.
+ * Development stand-in for DevDraft (BUILD_PLAN D20). Links point at the local /pay/test page;
+ * "paying" there sends a webhook signed exactly like DevDraft's to our own endpoint, so the real
+ * verification and processing code runs end to end. Refused in production by the config loader.
+ *
+ * The in-memory map is a cache; after an API restart, PaymentsService rehydrates from the
+ * `payments` table so open demo links keep working.
  */
 export class FakePaymentProvider implements PaymentProvider {
   readonly name = 'DEVDRAFT' as const;
   readonly mode = 'fake' as const;
-  readonly links = new Map<
-    string,
-    PaymentLinkRequest & { status: 'pending' | 'paid' | 'failed' }
-  >();
+  readonly links = new Map<string, FakeLink>();
 
   constructor(
     private readonly config: AppConfig['devdraft'],
@@ -31,7 +37,11 @@ export class FakePaymentProvider implements PaymentProvider {
 
   async createLink(req: PaymentLinkRequest): Promise<CreatedPaymentLink> {
     const id = randomUUID();
-    this.links.set(id, { ...req, status: 'pending' });
+    this.links.set(id, {
+      amountMinor: req.amountMinor,
+      currency: req.currency,
+      status: 'pending',
+    });
     const raw = {
       id,
       title: req.title,
@@ -45,6 +55,18 @@ export class FakePaymentProvider implements PaymentProvider {
       simulated: true,
     };
     return { providerLinkId: id, paymentUrl: `${this.publicWebUrl}/pay/test/${id}`, raw };
+  }
+
+  /** Restore a link after process restart (or in tests that clear the map). */
+  remember(
+    providerLinkId: string,
+    amountMinor: number,
+    currency: string,
+    status: FakeLink['status'] = 'pending',
+  ) {
+    if (!this.links.has(providerLinkId)) {
+      this.links.set(providerLinkId, { amountMinor, currency, status });
+    }
   }
 
   verifySignature(rawBody: Buffer, headers: Record<string, string | string[] | undefined>) {

@@ -132,7 +132,42 @@ export class JobQueue {
         `delete from jobs where (status in ('DONE', 'CANCELLED') and updated_at < @doneBefore)
                              or (status = 'FAILED' and updated_at < @failedBefore)`,
       ),
+      // Push a still-queued job later. Completed jobs keep their dedupe keys, so this never reuses one.
+      defer: sqlite.prepare(
+        `update jobs set run_at = @runAt, updated_at = @now
+         where id = (
+           select id from jobs
+           where queue = @queue and group_key = @groupKey and status = 'QUEUED'
+           limit 1)
+         returning *`,
+      ),
     };
+  }
+
+  /**
+   * One queued job per group. A second call before it runs only moves `run_at` later,
+   * so a burst of messages becomes a single turn.
+   */
+  coalesce<T>(
+    queue: string,
+    groupKey: string,
+    payload: T,
+    opts: { delayMs: number; maxAttempts?: number },
+  ): JobRow {
+    const now = Date.now();
+    const updated = this.s.defer.get({
+      queue,
+      groupKey,
+      runAt: now + opts.delayMs,
+      now,
+    }) as RawJobRow | undefined;
+    if (updated) return toJob(updated);
+    return this.enqueue(queue, payload, {
+      dedupeKey: `${queue}:${groupKey}:${newId()}`,
+      groupKey,
+      runAt: now + opts.delayMs,
+      maxAttempts: opts.maxAttempts ?? 3,
+    });
   }
 
   enqueue<T>(queue: string, payload: T, opts: EnqueueOptions = {}): JobRow {

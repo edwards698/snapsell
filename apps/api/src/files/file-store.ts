@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, open, readdir, rename, rm, stat, statfs, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, rename, rm, stat, statfs, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -201,6 +201,10 @@ export class FileStore {
 
   open(key: string) {
     return createReadStream(this.pathFor(key));
+  }
+
+  read(key: string) {
+    return readFile(this.pathFor(key));
   }
 
   async stat(key: string) {

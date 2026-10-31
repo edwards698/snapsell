@@ -23,6 +23,7 @@ import { EmailService } from '../email/email.service.js';
 import { JobQueue } from '../jobs/job-queue.js';
 import { JobWorker } from '../jobs/job-worker.js';
 import { LOGGER } from '../logging/logging.module.js';
+import { MessagingService } from '../messaging/messaging.service.js';
 import { signBody } from './devdraft.provider.js';
 import { FakePaymentProvider } from './fake.provider.js';
 import {
@@ -49,6 +50,7 @@ export class PaymentsService implements OnModuleInit {
     private readonly email: EmailService,
     private readonly events: EventBus,
     private readonly audit: AuditService,
+    private readonly messaging: MessagingService,
   ) {}
 
   onModuleInit() {
@@ -362,6 +364,10 @@ export class PaymentsService implements OnModuleInit {
         entity: 'order',
         entityId: order.id,
       });
+      this.notifyWhatsApp(
+        order,
+        `We could not confirm payment for order *${order.ref}* yet. Your reservation is still held for a little while — you can try the payment link again, or reply here for help.`,
+      );
       return finish('PROCESSED', 'Marked payment failed');
     }
 
@@ -417,6 +423,13 @@ export class PaymentsService implements OnModuleInit {
       });
       this.events.emit('stock.changed', { variantIds: [] });
       this.notifyOwner(order.id);
+      const total = formatMoney(order.totalMinor, order.currency, { trimZeros: true });
+      this.notifyWhatsApp(
+        order,
+        shortage
+          ? `Payment for *${order.ref}* (${total}) is confirmed, but stock needs the owner’s attention. We will message you shortly.`
+          : `Payment for *${order.ref}* (${total}) is confirmed. Thank you — we are preparing your order.`,
+      );
     }
   }
 
@@ -440,6 +453,10 @@ export class PaymentsService implements OnModuleInit {
       .orderBy(desc(payments.createdAt))
       .get();
     if (!payment?.providerLinkId) return 'no_link' as const;
+    // Demo links live in memory; rebuild from the payments row after a restart (D20).
+    if (this.provider instanceof FakePaymentProvider) {
+      this.hydrateFakeLink(payment.providerLinkId);
+    }
     const status = await this.provider.fetchLinkStatus(payment.providerLinkId);
     if (status === 'paid' || status === 'failed') {
       const body = Buffer.from(
@@ -493,30 +510,23 @@ export class PaymentsService implements OnModuleInit {
   // Test mode
   // ---------------------------------------------------------------------------
 
-  /** Test mode only: what the /pay/test page shows. */
+  /** Test mode only: what the /pay/test page shows. Survives API restarts via the payments row. */
   testLink(providerLinkId: string) {
-    const fake = this.fake();
-    const link = fake.links.get(providerLinkId);
-    const payment = this.handle.db
-      .select()
-      .from(payments)
-      .where(eq(payments.providerLinkId, providerLinkId))
-      .get();
-    if (!link || !payment)
-      throw new ApiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Test payment link not found.');
+    const payment = this.hydrateFakeLink(providerLinkId);
     const order = this.handle.db.select().from(orders).where(eq(orders.id, payment.orderId)).get()!;
     return {
       orderRef: order.ref,
       statusUrl: `/order/${order.ref}?t=${encodeURIComponent(order.statusToken)}`,
       amountMinor: payment.amountMinor,
       currency: payment.currency,
-      status: link.status,
+      status: this.fake().links.get(providerLinkId)!.status,
       shopName: this.shopName(),
     };
   }
 
   /** Test mode only: sends a signed webhook exactly as DevDraft would. */
   simulate(providerLinkId: string, outcome: 'completed' | 'failed') {
+    this.hydrateFakeLink(providerLinkId);
     const fake = this.fake();
     const body = fake.eventBody(providerLinkId, outcome);
     if (!body)
@@ -525,6 +535,22 @@ export class PaymentsService implements OnModuleInit {
     return this.receiveWebhook(Buffer.from(body), {
       [this.config.devdraft.signatureHeader]: signBody(this.config.devdraft.webhookSecret, body),
     });
+  }
+
+  /** Rebuild the in-memory fake link from the DB when the process restarted (D20). */
+  private hydrateFakeLink(providerLinkId: string) {
+    const fake = this.fake();
+    const payment = this.handle.db
+      .select()
+      .from(payments)
+      .where(eq(payments.providerLinkId, providerLinkId))
+      .get();
+    if (!payment)
+      throw new ApiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Test payment link not found.');
+    const status =
+      payment.status === 'PAID' ? 'paid' : payment.status === 'FAILED' ? 'failed' : 'pending';
+    fake.remember(providerLinkId, payment.amountMinor, payment.currency, status);
+    return payment;
   }
 
   private fake() {
@@ -545,6 +571,18 @@ export class PaymentsService implements OnModuleInit {
       url: `${this.config.publicWebUrl}/admin/orders/${order.ref}`,
       attention: order.needsAttention,
     });
+  }
+
+  private notifyWhatsApp(
+    order: typeof orders.$inferSelect,
+    body: string,
+  ) {
+    if (order.channel !== 'WHATSAPP' || !order.conversationId) return;
+    try {
+      this.messaging.sendTemplate(order.conversationId, body, 'SYSTEM');
+    } catch (err) {
+      this.logger.warn({ err, orderId: order.id }, 'Could not send WhatsApp payment notice');
+    }
   }
 
   private shopName() {

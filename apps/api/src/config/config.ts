@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { REPO_ROOT } from '../paths.js';
@@ -46,6 +47,10 @@ const envSchema = z.object({
   DEVDRAFT_PAYMENT_URL_FIELD: optionalString,
   /** Alternative once DevDraft confirms the format, e.g. https://pay.example.com/{url}. */
   DEVDRAFT_PAYMENT_URL_TEMPLATE: optionalString,
+  // WhatsApp service (BUILD_PLAN D9). Signs API <-> service calls; derived from SESSION_SECRET in
+  // development when unset, required in production.
+  INTERNAL_HMAC_SECRET: optionalString.pipe(z.string().min(32).optional()),
+  WHATSAPP_SERVICE_URL: z.url().default('http://127.0.0.1:4100'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -67,7 +72,8 @@ export interface AppConfig {
     logs: string;
     backups: string;
   };
-  secrets: { session: string; fileSigning: string };
+  secrets: { session: string; fileSigning: string; internalHmac: string };
+  whatsapp: { serviceUrl: string };
   email: { resendApiKey?: string; from: string };
   owner: { email?: string; name: string; initialPassword?: string };
   uploads: { maxBytes: number };
@@ -89,6 +95,11 @@ export interface AppConfig {
 
 export class ConfigError extends Error {}
 
+/** Must match `internalSecret()` in apps/whatsapp, which reads the same .env. */
+export function deriveInternalSecret(sessionSecret: string) {
+  return createHmac('sha256', sessionSecret).update('snapsell-internal-hmac').digest('base64url');
+}
+
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = envSchema.safeParse(source);
   if (!parsed.success) {
@@ -100,6 +111,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   if (e.DEVDRAFT_MODE === 'fake' && e.NODE_ENV === 'production') {
     throw new ConfigError(
       'Invalid configuration:\n  - DEVDRAFT_MODE: "fake" is for development only; use "sandbox" or "live"',
+    );
+  }
+  if (!e.INTERNAL_HMAC_SECRET && e.NODE_ENV === 'production') {
+    throw new ConfigError(
+      'Invalid configuration:\n  - INTERNAL_HMAC_SECRET: required in production (run `pnpm setup` to generate one)',
     );
   }
   if (e.DEVDRAFT_MODE !== 'fake') {
@@ -127,7 +143,12 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       logs: resolve(data, 'logs'),
       backups: resolve(data, 'backups'),
     },
-    secrets: { session: e.SESSION_SECRET, fileSigning: e.FILE_SIGNING_SECRET },
+    secrets: {
+      session: e.SESSION_SECRET,
+      fileSigning: e.FILE_SIGNING_SECRET,
+      internalHmac: e.INTERNAL_HMAC_SECRET ?? deriveInternalSecret(e.SESSION_SECRET),
+    },
+    whatsapp: { serviceUrl: e.WHATSAPP_SERVICE_URL.replace(/\/$/, '') },
     email: { resendApiKey: e.RESEND_API_KEY, from: e.EMAIL_FROM },
     owner: { email: e.OWNER_EMAIL, name: e.OWNER_NAME, initialPassword: e.OWNER_INITIAL_PASSWORD },
     uploads: { maxBytes: Math.round(e.MAX_UPLOAD_MB * 1024 * 1024) },

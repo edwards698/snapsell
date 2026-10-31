@@ -73,6 +73,8 @@ describe('default-deny auth', () => {
       'POST /api/admin/auth/forgot-password',
       'POST /api/admin/auth/login',
       'POST /api/admin/auth/reset-password',
+      'POST /api/internal/wa/events',
+      'POST /api/internal/wa/media',
       'POST /api/store/cart/price',
       'POST /api/store/checkout',
       'POST /api/test-payments/:linkId/:outcome',

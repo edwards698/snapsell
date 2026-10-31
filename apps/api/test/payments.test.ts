@@ -220,6 +220,16 @@ describe('webhooks', () => {
     await t.worker.drain();
     expect(order(o.ref).paymentStatus).toBe('PAID');
   });
+
+  it('demo payment page still works after the in-memory fake link cache is cleared', async () => {
+    const o = await placeOrder();
+    fake.links.clear();
+    const info = (await t.http().get(`/api/test-payments/${o.linkId}`).expect(200)).body;
+    expect(info).toMatchObject({ orderRef: o.ref, amountMinor: 50000, status: 'pending' });
+    await t.http().post(`/api/test-payments/${o.linkId}/completed`).expect(200);
+    await t.worker.drain();
+    expect(order(o.ref).paymentStatus).toBe('PAID');
+  });
 });
 
 describe('admin orders', () => {

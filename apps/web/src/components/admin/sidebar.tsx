@@ -5,6 +5,7 @@ import { ChevronsLeft, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isActive, NAV } from '@/lib/nav';
+import { UnreadBadge } from './unread-badge';
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = usePathname();
@@ -54,6 +55,11 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                       aria-hidden
                     />
                     {!collapsed && <span className="truncate">{item.label}</span>}
+                    {item.href === '/admin/inbox' && (
+                      <UnreadBadge
+                        className={collapsed ? 'absolute -top-0.5 right-1 scale-90' : 'ml-auto'}
+                      />
+                    )}
                     {!collapsed && item.phase && (
                       <span className="ml-auto rounded-md px-1.5 text-[10px] font-medium text-muted-foreground/70 group-hover:text-muted-foreground">
                         Soon

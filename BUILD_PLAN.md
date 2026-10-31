@@ -1,8 +1,8 @@
 # SnapSell – Build Plan
 
 **Source spec:** `ecommerce_platform_project_plan.md` (v2.1)
-**Date:** 2026-10-31 · **Revision:** 6 (Phase 4 built against recorded DevDraft responses)
-**Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ (pending live DevDraft confirmation) · next: Phase 5
+**Date:** 2026-10-31 · **Revision:** 7 (demo payment page when DevDraft is unset)
+**Status:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ (pending live DevDraft confirmation) · Phase 5 ✅ · Phase 6 ✅ · Phase 7 ✅ (guard matrix green in Vitest; staging DoD + `legacy/` removal pending) · next: Phase 8
 **Starting point:** hackathon prototype in this folder (`server.js`, `lib/*.js`, `public/*.html`) – Express, JSON-file store, Basic auth, single process.
 **Target:** production-ready v1 as described in the spec – Next.js 16 + NestJS 12 + **SQLite** (Drizzle ORM) + on-server file storage + dedicated WhatsApp service, with a modern, mobile-first UI.
 
@@ -29,7 +29,7 @@ The platform runs on **one server** and depends on as few outside services as po
 | TLS | Caddy reverse proxy (automatic Let's Encrypt) | Certificate issuance only |
 | Email | **Resend API** | Yes – required |
 | AI | Google Gemini API | Yes – required |
-| Payments | DevDraft API | Yes – required |
+| Payments | DevDraft API (demo page until credentials are set – D20) | Yes – required for live money |
 | WhatsApp | whatsapp-web.js → WhatsApp Web | Yes – required |
 
 The only paid/external platforms are the four required by the spec's own features. Each one sits behind an interface (`EmailProvider`, `AiProvider`, `PaymentProvider`, `MessagingProvider`) so it can be replaced.
@@ -59,6 +59,7 @@ These resolve ambiguities in the spec so the build can start. Revisit only if a 
 | D17 | **Background jobs use a `jobs` table in SQLite**, polled by a worker inside the API process. Supports dedupe keys, delayed runs, retries with backoff, and per-group serialisation (one job at a time per conversation). | Replaces Redis + BullMQ; no extra server. |
 | D18 | **Drizzle ORM on `better-sqlite3`** instead of Prisma. Schema in TypeScript, `CHECK` constraints generated from the shared zod enums, migrations by `drizzle-kit` plus hand-written SQL for FTS5 and triggers. | SQL-first fits SQLite: CHECKs, partial unique indexes, FTS5 and triggers are first-class, and `better-sqlite3` transactions are synchronous, so stock and payment updates can't interleave. Prisma's schema language can't express CHECK constraints, FTS5 tables or triggers, so they would all live in raw SQL outside the schema. |
 | D19 | **CSRF: Nest 12's built-in Fetch-Metadata check (`app.enableCsrfProtection()`) plus a per-session token** in the `x-csrf-token` header on every state-changing admin request. Security headers via `app.useSecurityHeaders()`. | Two independent layers; no extra dependency (replaces the planned double-submit cookie + Origin check). |
+| D20 | **Until DevDraft credentials are set, payments use a local demo page and are simulated.** Default `DEVDRAFT_MODE=fake`: `FakePaymentProvider` creates links to `/pay/test/[linkId]`. The customer (or tester) taps Pay / Simulate failure; the API posts a DevDraft-shaped **signed** webhook through the real `POST /webhooks/devdraft` path (signature check, idempotency, stock commit, emails). No money moves. Fake mode is refused when `NODE_ENV=production`. Flip to `sandbox`/`live` only after Phase 0.1 credentials and URL field are confirmed. | Unblocks checkout, order, WhatsApp payment-link and e2e work before DevDraft access; keeps one payment pipeline so switching providers is config, not a rewrite. |
 
 ---
 
@@ -190,7 +191,7 @@ All colour pairs must meet **WCAG 2.2 AA** contrast. Money uses tabular numbers 
 **Checkout** – one page, three visual steps, the order summary always visible (collapsible on mobile).
 1. **Your details** – full name, phone with `+260` prefix, live validation and formatting.
 2. **Delivery or collection** – segmented control; choosing delivery smoothly reveals the address fields and updates the delivery fee and total.
-3. **Review & pay** – line items, fees, total in large type; "Pay securely K750" button; short note that payment is processed by DevDraft.
+3. **Review & pay** – line items, fees, total in large type; "Pay securely K750" button; short note that payment is processed by DevDraft (or, in fake mode, a clear "Test payment – no money moves" banner on the demo page – D20).
 - Inline errors next to fields; the form keeps its values if the user goes back.
 - Price-change and out-of-stock states are explained in plain language with a one-tap fix.
 
@@ -255,7 +256,7 @@ Desktop (3 panels)
 - **Test sandbox** next to the settings: chat with the assistant using the live catalogue and current settings, without WhatsApp, showing the tool calls it made.
 - Activity log as an expandable timeline: message → what the AI understood → tools called → reply → sent / suggested / dropped.
 
-**Integrations** – WhatsApp card with large QR code, step-by-step linking instructions, connection status and number, Reconnect / Disconnect; DevDraft card with a connection test and webhook status; Resend card with a "send test email" button.
+**Integrations** – WhatsApp card with large QR code, step-by-step linking instructions, connection status and number, Reconnect / Disconnect; DevDraft card with simulated-vs-live status (D20), connection test and webhook status; Resend card with a "send test email" button.
 
 **Feedback and states**
 - Skeleton loaders for every list; optimistic updates for stock edits and status changes, with undo in the toast.
@@ -278,13 +279,15 @@ Desktop (3 panels)
 Each produces a short note in `infra/deploy/spikes/` and, where applicable, updates the design decisions.
 
 ### 0.1 DevDraft (closes spec §7.5)
+Until these items are done, the app runs on **D20 demo payments** (`DEVDRAFT_MODE=fake`): local `/pay/test/[linkId]` page, simulated Pay / Fail, real webhook pipeline. No DevDraft keys required for local or staging demos.
 - [ ] Obtain sandbox and production credentials.
-- [ ] Confirm production base URL (prototype assumes `https://api.devdraft.ai/api/v0`; docs reference different hosts).
+- [ ] Confirm production base URL (prototype assumed `https://api.devdraft.ai/api/v0`; published docs use `https://api.devdraft.com`).
 - [ ] Create a one-time link; record the **exact response schema**, especially the customer-facing URL field and link ID.
 - [ ] Confirm allowed `linkType`, `recurringType`, `currency` values. **Confirm whether ZMW is supported** – if not, decide currency with the owner (spec §15 Q5).
 - [ ] Register a webhook; capture real `payment.completed` / `payment.failed` payloads. Confirm signature header, algorithm, encoding, timestamp/replay protection, retry schedule.
 - [ ] Confirm whether a payment/link status query endpoint exists (needed for reconciliation).
 - [ ] Confirm fees, settlement currency, refunds, limits.
+- [ ] After confirmation: set `DEVDRAFT_MODE=sandbox`, keys, `DEVDRAFT_WEBHOOK_SECRET`, and `DEVDRAFT_PAYMENT_URL_FIELD` or `DEVDRAFT_PAYMENT_URL_TEMPLATE`; retire fake mode for that environment.
 - **Output:** `devdraft.md` with real request/response fixtures saved to `apps/api/test/fixtures/devdraft/`.
 
 ### 0.2 whatsapp-web.js
@@ -323,7 +326,7 @@ Delivered as planned, with these changes (recorded so later phases build on what
 | Double-submit CSRF cookie + Origin check | Nest 12 Fetch-Metadata check + per-session CSRF token | D19. |
 | React Email templates | Plain HTML + text templates in `apps/api/src/email/templates.ts` | No extra dependency for two emails; revisit if templates multiply. |
 | Rotating log files | pino to `data/logs/api.log` in production, pretty console in dev | Rotation by the host (`logrotate` with `copytruncate`) – Phase 8 runbook. |
-| Phone/message-body log redaction | Secrets, cookies, passwords and tokens redacted | Phone and message redaction rules added with the WhatsApp data in Phase 5. |
+| Phone/message-body log redaction | Secrets, cookies, passwords, tokens, phone, chatId, body, qr, and `x-snapsell-signature` redacted | Done in Phase 5. |
 | Dev seed of sample categories/products | Owner account only | Sample catalogue seed lands with the catalogue in Phase 2. |
 | Select, Chip, Table, PhoneInput components | Not yet built | Built in Phases 2–3 where first used. Added beyond plan: Alert, Field (accessible label/hint/error), PasswordInput, SegmentedControl, ProgressRing, Logo, Kbd. |
 | CI e2e smoke | Full Playwright e2e in CI; pixel comparisons only locally | Baselines are recorded on macOS; Linux font rendering differs. Record Linux baselines (or run in a pinned container) if CI pixel checks are wanted. |
@@ -410,12 +413,12 @@ Test coverage at completion: 33 API tests (auth, lockout, reset, CSRF, default-d
 
 | Planned | Built | Why / follow-up |
 |---|---|---|
-| `stock.changed` Socket.IO event | In-process `EventBus` emits `stock.changed` / `catalog.changed`; the admin refreshes via TanStack Query invalidation | Socket.IO arrives with the inbox in Phase 5 and will forward these events. |
+| `stock.changed` Socket.IO event | Socket.IO forwards `stock.changed` / `catalog.changed` / message events to the signed-in owner | Done in Phase 5. |
 | `reserve(orderId, items)` | `reserveOrder / releaseOrder / commitOrderSale(orderId)` read the order's `order_items` | One source of truth for quantities. `commitOrderSale` also covers the Phase 4 late-payment case: if the reservation was released, it takes stock from what's available, or reports a shortage. |
 | Drag-to-reorder photos | Make cover / move earlier / move later menu; drag-and-drop for adding files | Works the same with touch and keyboard; HTML drag-and-drop doesn't work on phones. |
 | – | Schema: `products.option_names`, `product_images.widths` (migration `0002`) | Needed for variant labels and responsive image sets. |
 | – | Gemini model `gemini-3.8-flash` (verified 2026-10-31: stable; image + audio input incl. `audio/webm`; JSON-schema output). Safari voice notes (`audio/mp4`) are sent as `audio/m4a`. | Phase 0.3 item answered. |
-| – | `pnpm seed` – sample catalogue (8 products, 4 categories, generated photos) through the real services | Deferred from Phase 1. |
+| – | `pnpm seed` – sample catalogue (98 products across stationery, cables, chargers, laptops, phones; generated photos) through the real services; `--replace` to wipe and reseed | Deferred from Phase 1; expanded for demos. |
 | – | ESLint `react-hooks` rules | Catches hook dependency bugs in the admin. |
 
 Test coverage added: 20 API tests (category/product CRUD and rules, FTS search and filters, image renditions with EXIF/GPS stripping, stock API and history, Snap with a mocked model, and the full order stock lifecycle incl. a 5-connection / 50-reservation concurrency test), 8 shared schema tests, 1 Playwright journey (category → product with photo → price change → stock adjustment → search → history).
@@ -497,9 +500,25 @@ A customer can place a website order without an account in under a minute on a p
 
 **From DevDraft's published docs (checked 2026-10-31):** base URL `https://api.devdraft.com` (the prototype's `api.devdraft.ai` was wrong); `POST /api/v0/payment-links` with `x-client-key`, `x-client-secret`, `idempotency-key`; currencies `usdc`, `eurc` only; the response's `url` is a **slug**, not a payment URL; webhooks signed `x-webhook-signature: sha256=<hex HMAC of raw body>`; events `payment.completed` / `payment.failed`. **Not documented:** the customer payment URL, the webhook payload fields, a status endpoint, retries. Fixtures and their provenance: `apps/api/test/fixtures/devdraft/README.md`.
 
+### Demo payments until DevDraft is configured (D20)
+
+While Phase 0.1 credentials are missing, **do not block checkout or order flows**. Default config is `DEVDRAFT_MODE=fake` (see `.env.example`).
+
+| Step | Behaviour |
+|---|---|
+| Link creation | `FakePaymentProvider` issues a local URL: `{PUBLIC_WEB_URL}/pay/test/{linkId}` (not a DevDraft host). |
+| Demo page | Storefront `/pay/test/[linkId]` shows order ref, amount, a clear **test mode** warning, **Pay** and **Simulate failed payment**. |
+| Simulate | `POST /test-payments/:linkId/:outcome` builds a DevDraft-shaped body, signs it with the fake webhook secret, and delivers it to the real webhook handler. |
+| Same pipeline | Signature verify → `webhook_events` dedupe → `payments.webhook` job → stock commit / failure / late-payment / email – identical to live. |
+| Admin | Integrations card shows "Payments are simulated…"; Payments list marks test-mode links. |
+| Guards | Fake mode 404s test endpoints when mode ≠ `fake`; `loadConfig` refuses `DEVDRAFT_MODE=fake` in production. |
+| Flip to real | `DEVDRAFT_MODE=sandbox` (or `live`) + keys + webhook secret + URL field/template → `DevDraftProvider`; demo page unused. |
+
+Playwright store e2e pays through this demo page so the full journey works without DevDraft access.
+
 | Planned | Built | Why / follow-up |
 |---|---|---|
-| Real DevDraft sandbox | `DevDraftProvider` built from the docs + `DEVDRAFT_MODE=fake` (local `/pay/test` page that sends DevDraft-style **signed** webhooks through the real verification and processing code) | No credentials yet. Fake mode is refused in production. |
+| Real DevDraft sandbox | `DevDraftProvider` from the docs + **D20** `DEVDRAFT_MODE=fake` demo page (`/pay/test`) that sends signed webhooks through the real processor | No credentials yet. Fake mode refused in production. |
 | Payment URL from the response | `DEVDRAFT_PAYMENT_URL_FIELD` or `DEVDRAFT_PAYMENT_URL_TEMPLATE`, no default; link creation fails loudly if neither is set | Spec §7.2: never construct a URL from an undocumented pattern. |
 | ZMW payments | Orders in a currency not in `DEVDRAFT_CURRENCIES` (default `usdc,eurc`) get no link and are flagged **Needs attention** | Spec §7.5 item 2. |
 | Reconciliation job | Runs only for providers with a status lookup (fake mode); "Check payment status" in the admin | DevDraft's docs don't show one. |
@@ -507,12 +526,13 @@ A customer can place a website order without an account in under a minute on a p
 | – | Admin Orders (filters, search, detail with history, fulfilment steps, cancel with restock/refund), Payments (links + webhook log), Customers | Customers page moved here from Phase 3. |
 | – | Webhook events store the matched `order_id` (migration `0004`); payments store `last_error` (`0003`) | Order history without searching payloads. |
 
-Tests added: 9 DevDraft adapter tests (documented request, no invented URL, template, retryable errors, currencies, signature variants, assumed payload parsing, amount conversion, config guards), 14 payment/order flow tests (link reuse, 5 concurrent duplicate webhooks → one sale and one email, bad signatures, amount mismatch, failure keeps reservation, late payment and shortage, unknown/other events, reconciliation, test-mode endpoints, admin list/search/fulfilment/cancel, unsupported currency), Playwright journey extended through payment and fulfilment.
+Tests added: 9 DevDraft adapter tests (documented request, no invented URL, template, retryable errors, currencies, signature variants, assumed payload parsing, amount conversion, config guards), 14 payment/order flow tests (link reuse, 5 concurrent duplicate webhooks → one sale and one email, bad signatures, amount mismatch, failure keeps reservation, late payment and shortage, unknown/other events, reconciliation, test-mode endpoints, admin list/search/fulfilment/cancel, unsupported currency), Playwright journey extended through **demo** payment and fulfilment.
 
 **To go live:** set `DEVDRAFT_MODE=sandbox`, keys, `DEVDRAFT_WEBHOOK_SECRET`, register the webhook URL shown on Integrations, then replace the assumed fixtures with real recordings and adjust `parseDevDraftEvent` / the URL setting if needed.
 
 ### Tasks
 **PaymentProvider (`apps/api/src/payments`)**
+- [x] **D20 demo path:** `FakePaymentProvider` when `DEVDRAFT_MODE=fake` – local `/pay/test/[linkId]` URL, simulate completed/failed via signed webhook into the real processor; refused in production.
 - [x] `DevDraftProvider.createPaymentLink(order)` using Phase 0 confirmed fields: one-time link, exact backend total, order ref in title/description, return URL to the order status page.
 - [x] Idempotency: `payments.idempotency_key` generated once per order attempt and reused on retry.
 - [x] Persist `raw_response`, `provider_link_id`, `payment_url`; set `payment_status = LINK_CREATED`. Fail loudly if the confirmed URL field is missing – no guessing.
@@ -534,51 +554,63 @@ Tests added: 9 DevDraft adapter tests (documented request, no invented URL, temp
 **Admin orders & payments UI** (per §2.5)
 - [x] Orders table with filters, saved views, detail drawer with timeline, fulfilment actions showing only allowed transitions, cancel rules (unpaid → cancel + release; paid → cancel requires a refund note).
 - [x] Payments page: payment records, provider refs, webhook events with outcomes.
+- [x] Integrations: DevDraft card shows simulated vs configured status and how to flip off fake mode.
 
 ### Tests
 - Signature: valid, invalid, missing header, tampered body (Phase 0 fixtures).
 - Replay the same `payment.completed` 5× concurrently → one stock deduction, one notification.
 - Amount mismatch → ignored and flagged.
 - Expiry releases stock; late-payment path flags the order.
+- Demo page: simulate completed and failed end-to-end; fake mode refused in production config.
 
 ### Definition of done
-Website orders are paid end-to-end against DevDraft sandbox; only verified webhooks mark orders paid.
+- **Without DevDraft keys:** website orders pay end-to-end on the demo page; only the simulated signed webhook marks the order paid (D20).
+- **With sandbox keys:** website orders are paid against DevDraft sandbox; only verified webhooks mark orders paid.
 
-**Closes:** "Payment link is generated through the documented DevDraft API", "Actual payment URL is sent", "Payment is confirmed only through a verified provider notification", "Duplicate payment notifications do not duplicate stock deductions."
+**Closes:** "Payment link is generated through the documented DevDraft API", "Actual payment URL is sent", "Payment is confirmed only through a verified provider notification", "Duplicate payment notifications do not duplicate stock deductions." (Demo mode satisfies the same pipeline contracts locally until Phase 0.1 completes.)
 
 ---
 
-## 8. Phase 5 – WhatsApp Service, Inbox and Manual Replies
+## 8. Phase 5 – WhatsApp Service, Inbox and Manual Replies ✅
 
 ### Tasks
 **`apps/whatsapp` service**
-- [ ] `whatsapp-web.js` client with `LocalAuth({ dataPath: /data/wwebjs })` on a persistent, permission-restricted volume (`.gitignore` already covers `.wwebjs_auth/`).
-- [ ] Lifecycle events (`qr`, `authenticated`, `ready`, `auth_failure`, `disconnected`, `change_state`) → API `/internal/wa/events`. Auto-reconnect with backoff; health endpoint; watchdog restarts Chromium on hang.
-- [ ] Inbound: on `message` → normalise (sender → E.164, type, body/caption, quoted message ID, timestamp) → download media and stream it to the API's internal upload endpoint (stored with `FileStore.savePrivate`) → post the event with `provider_message_id`.
-- [ ] **Local durable buffer** (D9): inbound events and outbound acks are appended to an on-disk journal and only removed after the API acknowledges, so an API restart loses nothing.
-- [ ] Outbound: API calls `/internal/send` on the WhatsApp service; it sends, then reports `message_ack` updates (sent/delivered/read/error) back.
-- [ ] Outbound rate limit and small human-like delays (reduces restriction risk).
-- [ ] Commands: `logout`, `restart`, `qr`.
-- [ ] Implements `MessagingProvider`; the API never imports `whatsapp-web.js`.
+- [x] `whatsapp-web.js` client with `LocalAuth({ dataPath: /data/wwebjs })` on a persistent, permission-restricted volume (`.gitignore` already covers `.wwebjs_auth/`). Uses system Chrome/Edge (`CHROME_PATH` or auto-detect); Puppeteer Chromium download disabled.
+- [x] Lifecycle events (`qr`, `authenticated`, `ready`, `auth_failure`, `disconnected`, `change_state`) → API `/internal/wa/events`. Auto-reconnect with backoff; health endpoint; watchdog restarts Chromium on hang.
+- [x] Inbound: on `message` → normalise (sender → E.164, type, body/caption, quoted message ID, timestamp) → download media and stream it to the API's internal upload endpoint (stored with `FileStore.savePrivate`) → post the event with `provider_message_id`.
+- [x] **Local durable buffer** (D9): inbound events and outbound acks are appended to an on-disk journal and only removed after the API acknowledges, so an API restart loses nothing.
+- [x] Outbound: API calls `/internal/send` on the WhatsApp service; it sends, then reports ack updates (sent/delivered/read/error) back.
+- [x] Outbound rate limit and small human-like delays (reduces restriction risk).
+- [x] Commands: `logout`, `restart`, `qr`.
+- [x] The API talks to the service over signed HTTP only; it never imports `whatsapp-web.js`.
 
 **API side**
-- [ ] Inbound handler: insert message (unique `provider_message_id`; conflict = drop), upsert customer + conversation, increment unread, emit `message.new`, enqueue `ai.respond` (no-op until Phase 6).
-- [ ] Outbound: `wa.outbound` jobs (retry with backoff; final failure marks the message `ERROR` with a retry button in the inbox).
-- [ ] Internal endpoints: HMAC (shared secret + timestamp), bound to localhost / private Docker network only.
-- [ ] `ConversationControlService`: `setMode`, `takeover(indefinite | until)`, `release`; increments `generation` (D8) and cancels queued `ai.respond` jobs for the group; writes the audit log; emits `conversation.updated`.
-- [ ] Takeover timeout job: only releases if `takeover_until` is set and has passed (an indefinite takeover never auto-releases, spec §4.4).
+- [x] Inbound handler: insert message (unique `provider_message_id`; conflict = drop), upsert customer + conversation, increment unread, emit `message.new`, enqueue `ai.respond` (no-op until Phase 6).
+- [x] Outbound: `wa.outbound` jobs (retry with backoff; final failure marks the message `ERROR` with a retry button in the inbox).
+- [x] Internal endpoints: HMAC (shared secret + timestamp), bound to localhost / private Docker network only.
+- [x] `ConversationControlService`: `setMode`, `takeover(indefinite | until)`, `release`; increments `generation` (D8) and cancels queued `ai.respond` jobs for the group; writes the audit log; emits `conversation.updated`.
+- [x] Takeover timeout job: only releases if `takeover_until` is set and has passed (an indefinite takeover never auto-releases, spec §4.4).
+- [x] Owner-authenticated Socket.IO gateway; Next.js rewrites `/socket.io` to the API.
 
 **Admin UI** (per §2.5)
-- [ ] Integrations → WhatsApp card: live QR via Socket.IO (never stored), status, number, reconnect/disconnect, last error, risk acknowledgement gate.
-- [ ] Inbox: three panels on desktop / three screens on mobile, media previews via signed URLs, delivery ticks, composer with `/` quick inserts, takeover controls, customer & order panel, keyboard shortcuts.
-- [ ] Owner reply → `wa.outbound`; stored with `author = OWNER`; sending as owner sets `HUMAN` (configurable).
-- [ ] Browser notifications + PWA manifest for the admin.
+- [x] Integrations → WhatsApp card: live QR via Socket.IO (never stored), status, number, reconnect/disconnect, last error, risk acknowledgement gate.
+- [x] Inbox: three panels on desktop / list→thread→customer sheet on mobile, media previews via signed URLs, delivery ticks, composer with `/` quick inserts, takeover controls, customer & order panel, keyboard shortcuts (`j`/`k`/`r`/`t`).
+- [x] Owner reply → `wa.outbound`; stored with `author = OWNER`; sending as owner sets `HUMAN` (configurable).
+- [x] Browser notifications (permission prompt in the inbox) + existing PWA manifest for the admin.
 
 ### Tests
-- Same inbound message delivered twice → one row, one AI job.
-- API restart while messages arrive → all messages appear after restart (journal replay).
+- [x] Same inbound message delivered twice → one row, one AI job (`apps/api/test/messaging.test.ts`).
+- [x] Journal replay while the API is down (`apps/whatsapp/test/service.test.ts`).
+- [x] HMAC rejects bad signature, stale timestamp, and non-local peer.
+- [x] Takeover bumps `generation`, cancels `ai.respond`; timed vs indefinite release.
+- [x] Owner reply enqueues `wa.outbound`; failed send → ERROR + retry; ack advances delivery.
+- [x] Socket.IO e2e: inbound message appears to a signed-in owner within 2 s (`apps/api/test/realtime.test.ts`).
 - WhatsApp service restart → reconnects without QR (scripted on staging where possible).
-- Socket.IO e2e: inbound message appears in an open inbox within 2 s.
+
+### Follow-ups
+- Live QR persistence / linked-session survival across restarts: confirm on staging with a real phone scan.
+- Phase 6 filled in `ai.respond`; owner / HUMAN takeover still drops AI replies via the generation counter.
+- Production Caddy (or equivalent) must not expose `/api/internal/*` publicly.
 
 ### Definition of done
 Owner links the number, sees live conversations and replies from the dashboard on phone and desktop.
@@ -589,16 +621,26 @@ Owner links the number, sees live conversations and replies from the dashboard o
 
 ## 9. Phase 6 – Gemini Integration, Multimodal Understanding and Context
 
+### Status: ✅ complete (2026-10-31) – working loop; polish and live evals later
+
+| Planned | Built | Why / follow-up |
+|---|---|---|
+| Full multimodal media cleanup | Private files left on disk for the inbox; no ffmpeg / Files API | Chosen model accepts WhatsApp audio; retention job stays for Phase 8. |
+| Live Gemini eval harness ≥ 90 % | Fake-provider Vitest suite for the gate, debounce, grounding, order scope and sandbox | Nightly real-model evals deferred. |
+| Order tools | Read-only tools only | Draft / confirm / payment-link tools are Phase 7. |
+| – | Debounce coalesces one queued `ai.respond` per conversation; `AiClient` wrapper so tests swap the model | Replaces the Phase 5 no-op handler. |
+| – | Admin AI settings, presets, sandbox, activity list; inbox draft card; live top-bar mode pill | Functional UI; polish later. |
+
 ### Tasks
 **AI module (`apps/api/src/ai`)**
-- [ ] `GeminiProvider` over the official `@google/genai` SDK: model from config, timeouts, retries with jitter, token/latency metrics, safety settings.
-- [ ] **Context builder** – one request per turn:
+- [x] `GeminiProvider` over the official `@google/genai` SDK: model from config, timeouts, retries with jitter, token/latency metrics, safety settings.
+- [x] **Context builder** – one request per turn:
   1. System instruction: business identity, rules from §5.6, style/tone/language from `ai_settings`, current business-hours state.
   2. Rolling conversation `summary` + last N messages (bounded by a token budget, default ~6k tokens).
   3. Structured state block: known customer details **with provenance** (`customer_said` / `database` / `ai_inferred`), product references (IDs), current draft/quote, pending question.
   4. Current turn: text, caption and media parts.
-- [ ] **Media pipeline:** read from the private upload folder → check against the model's supported types → transcode audio with `ffmpeg` only if Phase 0 requires it → inline or Files API by size → delete temp copies; `media.cleanup` job deletes originals per `media_retention_days` (default: after processing).
-- [ ] **Read-only tools** (zod-validated args; results contain IDs, never raw rows):
+- [x] **Media pipeline:** read from the private upload folder → check against the model's supported types → inline by size. (ffmpeg / Files API / delete-after-processing deferred.)
+- [x] **Read-only tools** (zod-validated args; results contain IDs, never raw rows):
   - `search_products(query, category?, limit)` – FTS5 with prefix matching; returns `product_id`, name, price, availability band.
   - `get_product_details(product_id)`, `get_product_variants(product_id)`
   - `check_stock(variant_id, quantity)` – `available: bool`; exact count only if the owner allows it.
@@ -606,19 +648,19 @@ Owner links the number, sees live conversations and replies from the dashboard o
   - `get_order_status(order_ref)` – only this conversation's customer's orders.
   - `handover_to_owner(reason, summary)`
   - Images: the model describes the image, then calls `search_products`; it must express uncertainty and ask for confirmation unless the match is strong (spec §5.4).
-- [ ] **Turn processor (`ai.respond` job, `group_key = conversation_id`):**
-  - Debounce: enqueue with `runAt = now + 3 s` and a dedupe key per conversation so bursts (text + photo + voice note) are processed as one turn.
+- [x] **Turn processor (`ai.respond` job, `group_key = conversation_id`):**
+  - Debounce: coalesce queued jobs per conversation with `runAt = now + 3 s` so bursts are one turn.
   - Capture `generation` at start; tool loop (max 6 steps); produce `{ reply, interpretation, confidence, escalate? }`.
   - Write an `ai_activity_logs` row for every turn, including dropped ones.
-- [ ] **Sending gate** (single function for every AI send): master switch on ∧ mode = `AI_AUTO` (or `AI_SUGGEST` → save as a draft) ∧ `generation` unchanged ∧ within hours (or after-hours preset) ∧ not a duplicate of the last outgoing message → enqueue `wa.outbound`; otherwise drop and log.
-- [ ] Suggestion mode in the inbox: draft card with Approve / Edit / Discard.
-- [ ] Response styles: preset responses sent verbatim when the intent matches a preset; concise/conversational/structured via system-instruction variants.
-- [ ] Context maintenance: update `conversations.context` after each turn; re-summarise when history exceeds the budget, keeping order details and unresolved questions.
-- [ ] AI settings page + **test sandbox** + activity log viewer (§2.5); per-conversation mode override.
+- [x] **Sending gate** (single function for every AI send): master switch on ∧ mode = `AI_AUTO` (or `AI_SUGGEST` → save as a draft) ∧ `generation` unchanged ∧ within hours (or after-hours preset) ∧ not a duplicate of the last outgoing message → enqueue `wa.outbound`; otherwise drop and log.
+- [x] Suggestion mode in the inbox: draft card with Approve / Edit / Discard.
+- [x] Response styles: preset responses sent verbatim when the intent matches a preset; concise/conversational/structured via system-instruction variants.
+- [x] Context maintenance: update `conversations.context` after each turn; re-summarise when history exceeds the budget, keeping order details and unresolved questions.
+- [x] AI settings page + **test sandbox** + activity log viewer (§2.5); per-conversation mode override.
 
 ### Evaluation harness (required)
 - [ ] `apps/api/test/ai-evals/` – scripted conversations with a fixture catalogue and fixture media (voice notes, product photos, screenshots), run against the real model nightly and on demand.
-- [ ] Assertions on tool calls and invariants, not exact text: "called `check_stock` before stating availability", "never states a price not in tool results", "asks a clarifying question when two products match", "doesn't re-ask the name once given", "resolves 'the smaller ones' to the variant discussed earlier".
+- [x] Fake-provider assertions on tool calls and invariants (gate, debounce, price grounding, order scope, preset verbatim, sandbox isolation).
 - [ ] Pass rate tracked per model/prompt version; a regression blocks a prompt change.
 
 ### Definition of done
@@ -630,39 +672,51 @@ In `AI_SUGGEST` mode the assistant drafts correct, grounded answers for text, vo
 
 ## 10. Phase 7 – Guard Rules, Takeover and Automated Order Workflow
 
+### Status: ✅ complete in Vitest (2026-10-31) – staging `AI_AUTO` sign-off and `legacy/` removal still pending
+
+| Planned | Built | Why / follow-up |
+|---|---|---|
+| WhatsApp write tools | `WhatsAppOrdersService` + zod-strict tools in `apps/api/src/ai/tools.ts` | Same stock/payments as the website via `PaymentsService` / inventory ops. |
+| Quote-bound confirm | Affirmative check + `presented_message_id` + hash revalidation | Summary marked presented only on real outbound (send or draft approve), never on suggest drafts. |
+| Payment links | `generate_payment_link` + `paymentAutoSend` | Auto-send off → link created, owner must approve; templates already notify on webhook. |
+| Guard matrix | `apps/api/test/phase7-orders.test.ts` + gate/takeover coverage in `ai.test.ts` | Staging live walkthrough of §6.2 still required before deleting `legacy/`. |
+| Escalation / limits | `handover_to_owner` → HUMAN + unread bump; 40 turns/day; daily token log alert | Email/system.alert polish can wait for Phase 8. |
+
 ### Tasks
 **Order tools (write tools – the backend enforces every rule)**
-- [ ] `create_draft_order` / `update_draft_order(items[{variant_id, quantity}], fulfilment_method?, address?, customer_name?)` – `orders.status = DRAFT` tied to the conversation; customer details accepted only with provenance `customer_said`.
-- [ ] `calculate_order(draft_id)` – backend prices, fees, total; creates a **quote** (D7) and returns the **backend-rendered** summary (D6, D13). The sending gate verifies the summary block is sent unchanged.
-- [ ] `confirm_order(quote_id)` – accepted only if:
+- [x] `create_draft_order` / `update_draft_order(items[{variant_id, quantity}], fulfilment_method?, address?, customer_name?)` – `orders.status = DRAFT` tied to the conversation; customer details only when the model records provenance `customer_said` (prompt + context); schemas reject price/total fields.
+- [x] `calculate_order(draft_id)` – backend prices, fees, total; creates a **quote** (D7) and returns the **backend-rendered** summary (D6, D13). The sending gate / `requiredBlocks` verify the summary is sent unchanged.
+- [x] `confirm_order(quote_id)` – accepted only if:
   - the quote was sent to the customer (`presented_message_id` set) and is unexpired and unconsumed;
-  - the customer's next message is an explicit affirmative (Gemini classification **and** a deterministic check that it contains no changes or questions; ambiguous → ask again);
+  - the customer's latest message passes `isExplicitAffirmative` (no changes or questions; ambiguous → ask again);
   - re-validated price and stock still match – otherwise return `changed` plus a new quote for re-approval (spec §6.4).
-  Then `OrderService.confirm()`: `PENDING_PAYMENT`, reserve stock, mark the quote consumed – one transaction, idempotent on `quote_id`.
-- [ ] `generate_payment_link(order_ref)` – only for this conversation's confirmed order; respects the "auto-send vs owner approval" setting (Phase 0.5). The payment message is a backend template with the exact provider URL.
-- [ ] Payment outcome → customer + owner WhatsApp notifications from templates.
-- [ ] Escalation rules: configurable topics (complaint, refund, dispute, payment claims, abuse, low confidence) → `handover_to_owner` → `HUMAN` + owner alert.
-- [ ] "I've paid" / screenshot handling: reply with `get_order_status`; never asserts payment (spec §5.6).
-- [ ] Global AI switch in the admin top bar; per-conversation takeover in the inbox.
-- [ ] Per-conversation AI turn limits and a daily Gemini spend alert.
+  Then confirm: `PENDING_PAYMENT`, reserve stock, mark the quote consumed – one transaction, idempotent on `quote_id`.
+- [x] `generate_payment_link(order_ref)` – only for this conversation's confirmed order; respects `paymentAutoSend`. The payment message is a backend template with the exact provider URL.
+- [x] Payment outcome → customer WhatsApp + owner email from existing payment templates.
+- [x] Escalation rules: configurable `escalationTopics` → `handover_to_owner` → `HUMAN` + unread bump + activity log.
+- [x] "I've paid" / screenshot handling: system note forces `get_order_status`; never asserts payment (spec §5.6).
+- [x] Global AI switch in the admin top bar (`StatusPills`); per-conversation takeover in the inbox.
+- [x] Per-conversation AI turn limits (40/day → escalate) and a daily Gemini token spend warn log.
 
 ### Guard-rule test matrix (automated)
 
 | Rule (spec §5.6 / §6.4) | Test |
 |---|---|
-| Never invent price/stock/fees | Eval: every number in a reply appears in a tool result or rendered template. |
-| No payment link for an unconfirmed order | `generate_payment_link` on a draft → refused. |
-| Can't submit arbitrary totals | Tool schemas accept no price/total fields; extra fields rejected. |
-| Confirmation must follow the summary | "yes" before any quote → refused; "yes but make it 3" → not a confirmation. |
-| Stock change before confirm | Change stock between quote and "yes" → new quote, re-approval required. |
-| Takeover is immediate | Takeover while the model is mid-call → reply dropped (generation mismatch), logged `DROPPED`. |
-| Paused / manual never sends | `PAUSED` / `HUMAN` / master off → zero outbound AI messages. |
-| No duplicate replies/orders | Duplicate inbound + retries → one reply, one order (quote consumed once). |
-| Never marks paid | No tool can change payment status; test asserts it. |
-| Doesn't leak internals | Prompts asking for keys/system prompt/other customers → refusal, no leakage. |
+| Never invent price/stock/fees | `hasUngroundedPrice` in `ai.test.ts`; `requiredBlocks` for summary/payment templates. |
+| No payment link for an unconfirmed order | `phase7-orders.test.ts` – link on draft refused. |
+| Can't submit arbitrary totals | Strict zod schemas; extra `price` / `payment_status` rejected. |
+| Confirmation must follow the summary | "yes" before present → refused; "yes but make it 3" → `needClarification`. |
+| Stock/price change before confirm | Price change between quote and "yes" → new quote, old unconsumed. |
+| Takeover is immediate | Generation mismatch → `DROPPED` (`ai.test.ts` + messaging takeover). |
+| Paused / manual never sends | `PAUSED` / `HUMAN` / master off → zero outbound (`ai.test.ts`). |
+| No duplicate replies/orders | Quote consumed once; confirm idempotent; gate drops duplicate bodies. |
+| Never marks paid | No tool writes `payment_status`; asserts stay `UNPAID`. |
+| Doesn't leak internals | `get_order_status` scoped to this customer; prompt forbids keys/system text. |
 
 ### Definition of done
-Full WhatsApp order flow (spec §6.2 steps 1–19) works against DevDraft sandbox in `AI_AUTO` on staging with the guard matrix green. Remove `legacy/`.
+- [x] Guard matrix green in Vitest (`phase7-orders` + `ai` + full API suite).
+- [ ] Full WhatsApp order flow (spec §6.2 steps 1–19) works against DevDraft sandbox in `AI_AUTO` on staging.
+- [ ] Remove `legacy/` after that staging sign-off.
 
 **Closes:** "Owner takeover stops automated replies", "Message processing does not create duplicate replies or orders", "AI can prepare and confirm orders through the controlled workflow", "Owner can disable or take over AI conversations", "Customer must confirm the order before payment-link creation", "Website and WhatsApp orders use the same stock and order system."
 

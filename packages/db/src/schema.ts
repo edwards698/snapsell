@@ -494,6 +494,8 @@ export const messages = sqliteTable(
     type: enumText('type', MessageType).notNull().default('TEXT'),
     body: text('body'),
     media: json<MessageMedia>('media'),
+    /** The WhatsApp message this one replies to, if any. */
+    quotedProviderMessageId: text('quoted_provider_message_id'),
     deliveryState: text('delivery_state'),
     aiDraftStatus: enumText('ai_draft_status', AiDraftStatus).notNull().default('NONE'),
     createdAt: createdAt(),

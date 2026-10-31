@@ -6,6 +6,8 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
   protobufjs: false
+  # The WhatsApp service uses the system Chrome/Edge (CHROME_PATH); no bundled Chromium download.
+  puppeteer: false
   sharp: true
 minimumReleaseAgeExclude:
   - '@swc/core-darwin-arm64@1.16.21'

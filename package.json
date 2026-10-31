@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "demo": "node scripts/demo.mjs",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",

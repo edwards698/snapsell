@@ -54,7 +54,6 @@ export const NAV: NavGroup[] = [
         label: 'Inbox',
         icon: MessageCircle,
         description: 'Customer WhatsApp chats, AI drafts and one-tap takeover.',
-        phase: 5,
         keywords: ['whatsapp', 'chat', 'messages'],
       },
     ],
@@ -121,7 +120,6 @@ export const NAV: NavGroup[] = [
         label: 'AI Assistant',
         icon: Sparkles,
         description: 'How the assistant talks, what it may do, and a sandbox to try it.',
-        phase: 6,
         keywords: ['gemini', 'bot'],
       },
       {

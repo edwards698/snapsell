@@ -13,7 +13,8 @@ if (existsSync(target)) {
 const secret = () => randomBytes(32).toString('base64url');
 let env = readFileSync(new URL('../.env.example', import.meta.url), 'utf8')
   .replace(/^SESSION_SECRET=$/m, `SESSION_SECRET=${secret()}`)
-  .replace(/^FILE_SIGNING_SECRET=$/m, `FILE_SIGNING_SECRET=${secret()}`);
+  .replace(/^FILE_SIGNING_SECRET=$/m, `FILE_SIGNING_SECRET=${secret()}`)
+  .replace(/^INTERNAL_HMAC_SECRET=$/m, `INTERNAL_HMAC_SECRET=${secret()}`);
 
 if (process.stdin.isTTY) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
