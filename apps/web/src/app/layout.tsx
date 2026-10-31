@@ -2,7 +2,12 @@ import { Toaster, TooltipProvider } from '@snapsell/ui';
 import { GeistMono } from 'geist/font/mono';
 import { GeistSans } from 'geist/font/sans';
 import type { Metadata, Viewport } from 'next';
-import { ThemeProvider } from 'next-themes';
+import { ThemeBootstrapScript } from '@/components/providers/theme-bootstrap-script';
+import { ThemeProvider } from '@/components/providers/theme-provider';
+import {
+  getThemeInitScript,
+  themeProviderProps,
+} from '@/components/providers/theme-script';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -23,6 +28,12 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const themeScript = getThemeInitScript({
+    attribute: themeProviderProps.attribute,
+    defaultTheme: themeProviderProps.defaultTheme,
+    enableSystem: themeProviderProps.enableSystem,
+  });
+
   return (
     <html
       lang="en"
@@ -30,12 +41,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <body className="min-h-dvh">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ThemeBootstrapScript script={themeScript} />
+        <ThemeProvider {...themeProviderProps}>
           <TooltipProvider>
             {children}
             <Toaster />

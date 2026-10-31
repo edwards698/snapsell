@@ -29,3 +29,5 @@ minimumReleaseAgeExclude:
   - lucide-react@1.66.0
   - motion-dom@14.9.0
   - motion@14.9.0
+patchedDependencies:
+  next-themes@0.4.6: patches/next-themes@0.4.6.patch
